@@ -18,73 +18,69 @@ import {
   Activity,
   LogOut,
   Menu,
-  X
+  X,
+  AlertCircle,
+  ShieldCheck,
+  TrendingUp,
+  Wind,
+  Target,
+  Trophy,
+  Lock,
+  Award,
+  Thermometer,
+  Waves,
+  Zap,
+  Flower2
 } from 'lucide-react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+// DTE Ecosystem Services
+import { auth, db } from './firebase';
+import { golfAPI, GolfCourse, TeeTime } from './services/golfAPIService';
+import { handleClubhouseBooking } from './services/fluffIntegration';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Types
-interface GolfCourse {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  latitude: number;
-  longitude: number;
-  phone?: string;
-  website?: string;
-  rating?: number;
-  holes?: number;
-  par?: number;
-  distance?: number;
-  photoUrl?: string;
-}
-
-interface TeeTime {
-  id: string;
-  courseId: string;
-  time: string;
-  date: string;
-  availableSlots: number;
-  price: number;
-  holes: number;
-}
-
-interface UserLocation {
-  latitude: number;
-  longitude: number;
-}
-
 export default function App() {
-  // State Management
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  // ── SYSTEM STATE ──
+  const [user, setUser] = useState<User | null>(null);
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // ── DATA STATE ──
   const [courses, setCourses] = useState<GolfCourse[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<GolfCourse | null>(null);
   const [teeTimes, setTeeTimes] = useState<TeeTime[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // Filter State
+  // ── FILTER STATE ──
   const [searchRadius, setSearchRadius] = useState(25);
   const [maxPrice, setMaxPrice] = useState(150);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [playerCount, setPlayerCount] = useState(4);
-  const [activeTab, setActiveTab] = useState('dashboard');
 
+  // Uplink Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Uplink Location & Search
   useEffect(() => {
     getUserLocation();
   }, []);
 
   useEffect(() => {
     if (userLocation) {
-      searchCourses();
+      performLiveSearch();
     }
   }, [userLocation, searchRadius]);
 
@@ -97,23 +93,34 @@ export default function App() {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           });
-          setLoading(false);
         },
         () => {
           setUserLocation({ latitude: 41.8781, longitude: -87.6298 });
-          setError('Location access denied. Using default: Chicago.');
           setLoading(false);
         }
       );
     }
   };
 
-  const searchCourses = async () => {
-    // Mock loading sequence
+  const performLiveSearch = async () => {
+    if (!userLocation) return;
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const results = await golfAPI.searchCourses({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        radius: searchRadius
+      });
+      const coursesWithDistance = results.map(course => ({
+        ...course,
+        distance: golfAPI.calculateDistance(userLocation.latitude, userLocation.longitude, course.latitude, course.longitude)
+      }));
+      setCourses(coursesWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0)));
+    } catch (err: any) {
       loadMockCourses();
-    }, 1000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadMockCourses = () => {
@@ -147,189 +154,407 @@ export default function App() {
         par: 72,
         distance: 45.2,
         photoUrl: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800'
-      },
-      {
-        id: '3',
-        name: 'TPC Sawgrass',
-        address: '110 Championship Way',
-        city: 'Ponte Vedra Beach',
-        state: 'FL',
-        zipCode: '32082',
-        latitude: 30.1977,
-        longitude: -81.3936,
-        rating: 4.8,
-        holes: 18,
-        par: 72,
-        distance: 8.7,
-        photoUrl: 'https://images.unsplash.com/photo-1592919505780-303950717480?w=800'
       }
     ];
     setCourses(mockCourses);
-    setLoading(false);
   };
 
-  const loadTeeTimes = (courseId: string) => {
-    const mockTeeTimes: TeeTime[] = [
-      { id: '1', courseId, time: '7:30 AM', date: selectedDate, availableSlots: 4, price: 85, holes: 18 },
-      { id: '2', courseId, time: '9:00 AM', date: selectedDate, availableSlots: 2, price: 110, holes: 18 },
-      { id: '3', courseId, time: '1:30 PM', date: selectedDate, availableSlots: 4, price: 75, holes: 18 }
-    ];
-    setTeeTimes(mockTeeTimes);
-  };
-
-  const handleCourseSelect = (course: GolfCourse) => {
+  const handleCourseSelect = async (course: GolfCourse) => {
     setSelectedCourse(course);
-    loadTeeTimes(course.id);
+    setLoading(true);
+    try {
+      const times = await golfAPI.getTeeTimes(course.id, selectedDate);
+      setTeeTimes(times.filter(t => t.price <= maxPrice));
+    } catch (err) {
+      setTeeTimes([
+        { id: 't1', courseId: course.id, time: '7:30 AM', date: selectedDate, availableSlots: 4, price: 85, holes: 18 },
+        { id: 't2', courseId: course.id, time: '9:00 AM', date: selectedDate, availableSlots: 2, price: 110, holes: 18 }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBooking = async (teeTime: TeeTime) => {
+    if (!selectedCourse) return;
+    setLoading(true);
+    try {
+      const result = await handleClubhouseBooking(teeTime, selectedCourse, playerCount);
+      if (result.success) {
+        alert(`✅ Reservation Confirmed: Your round at ${selectedCourse.name} is secured.`);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (err: any) {
+      alert(`❌ Booking Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="flex h-screen bg-[#000000] text-white font-inter">
+    <div className="flex h-screen bg-[#000000] text-white font-space mesh-bg">
       
-      {/* ── THE 19TH HOLE SIDEBAR ── */}
+      {/* ── THE CLUBHOUSE SIDEBAR ── */}
       <aside className={cn(
-        "bg-[#080808] border-r border-white/5 flex flex-col transition-all duration-500 z-50",
-        sidebarOpen ? "w-[280px]" : "w-[80px]"
+        "glass-surface flex flex-col transition-all duration-700 z-50 border-r border-white/5",
+        sidebarOpen ? "w-[360px]" : "w-[120px]"
       )}>
-        {/* Logo Section */}
-        <div className="p-6 flex items-center gap-4 border-b border-white/5 h-[100px]">
-          <div className="w-10 h-10 bg-[#00ffcc] rounded-xl flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(0,255,204,0.3)]">
-            <span className="font-black text-black text-xl">D</span>
+        {/* Brand Section */}
+        <div className="p-12 flex flex-col gap-8 h-[220px] border-b border-white/5 relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-accent/40 via-accent/5 to-transparent" />
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-gradient-to-br from-accent to-accent/60 rounded-[24px] flex items-center justify-center shrink-0 shadow-[0_0_50px_rgba(0,255,204,0.35)] rotate-3 group-hover:rotate-0 transition-transform duration-700">
+              <span className="font-black text-black text-4xl tracking-tighter">D</span>
+            </div>
+            {sidebarOpen && (
+              <div className="animate-in fade-in slide-in-from-left-6 duration-1000">
+                <h1 className="font-display text-4xl tracking-tight leading-none text-glow uppercase">Clubhouse</h1>
+                <p className="text-[10px] font-tech text-accent/50 uppercase tracking-[0.6em] mt-3">Elite Member Portal</p>
+              </div>
+            )}
           </div>
           {sidebarOpen && (
-            <div className="overflow-hidden whitespace-nowrap">
-              <h1 className="font-display text-xl tracking-tighter">CLUBHOUSE</h1>
-              <p className="text-[8px] font-tech text-[#00ffcc] tracking-[0.4em] uppercase">The 19th Hole</p>
+            <div className="flex items-center gap-3 bg-white/[0.03] p-3 rounded-2xl border border-white/5">
+              <Award className="text-yellow-500 w-5 h-5 shadow-[0_0_15px_rgba(234,179,8,0.4)]" />
+              <div className="flex flex-col">
+                <span className="text-[9px] font-tech text-white/40 uppercase tracking-widest leading-none">Heritage Status</span>
+                <span className="text-[10px] font-bold text-yellow-500/90 uppercase mt-1 tracking-tighter">Augusta Circle • 8x Patron</span>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Tactical Links */}
-        <nav className="flex-1 p-4 space-y-2 mt-4">
+        {/* Navigation */}
+        <nav className="flex-1 p-10 space-y-6 mt-6">
           <NavItem 
-            icon={<LayoutDashboard size={20} />} 
-            label="Nexus Dashboard" 
+            icon={<LayoutDashboard size={28} />} 
+            label="Dashboard" 
             active={activeTab === 'dashboard'} 
             expanded={sidebarOpen}
             onClick={() => setActiveTab('dashboard')}
           />
           <NavItem 
-            icon={<Search size={20} />} 
-            label="Course Finder" 
+            icon={<Search size={28} />} 
+            label="The Links" 
             active={activeTab === 'search'} 
             expanded={sidebarOpen}
             onClick={() => setActiveTab('search')}
           />
           <NavItem 
-            icon={<BookOpen size={20} />} 
-            label="Booking History" 
-            active={activeTab === 'history'} 
+            icon={<BookOpen size={28} />} 
+            label="The Ledger" 
+            active={activeTab === 'ledger'} 
             expanded={sidebarOpen}
-            onClick={() => setActiveTab('history')}
+            onClick={() => setActiveTab('ledger')}
           />
           <NavItem 
-            icon={<CloudRain size={20} />} 
-            label="Weather Intel" 
+            icon={<CloudRain size={28} />} 
+            label="Caddie Intel" 
             active={activeTab === 'weather'} 
             expanded={sidebarOpen}
             onClick={() => setActiveTab('weather')}
           />
         </nav>
 
-        {/* System Status */}
-        <div className="p-6 border-t border-white/5">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-[#00ffcc] animate-pulse" />
-            {sidebarOpen && (
-              <span className="text-[10px] font-tech uppercase tracking-widest text-white/40">Uplink Active</span>
-            )}
-          </div>
+        {/* User Card */}
+        <div className="p-10 border-t border-white/5 bg-white/[0.01]">
+          {sidebarOpen ? (
+            <div className="flex flex-col gap-5 animate-in fade-in duration-1000">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-tech uppercase tracking-widest text-white/30">Locker No.</span>
+                <span className="text-[10px] font-mono text-accent bg-accent/10 px-3 py-1 rounded-full uppercase border border-accent/20 font-bold">DT-08</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="w-3 h-3 rounded-full bg-accent animate-pulse shadow-[0_0_20px_rgba(0,255,204,0.7)]" />
+                <span className="text-[12px] font-tech uppercase tracking-[0.3em] text-white/90">System: Operational</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <div className="w-4 h-4 rounded-full bg-accent animate-pulse shadow-[0_0_20px_rgba(0,255,204,0.7)]" />
+            </div>
+          )}
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT PANE ── */}
+      {/* ── MAIN CONTENT ── */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
-        {/* Top Header */}
-        <header className="h-[100px] border-b border-white/5 flex items-center justify-between px-8 bg-black/50 backdrop-blur-xl z-40">
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-white/40 hover:text-[#00ffcc]"
-          >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-
-          <div className="flex items-center gap-6">
-            <div className="text-right hidden sm:block">
-              <p className="text-[10px] font-tech text-white/40 uppercase tracking-widest">Active Member</p>
-              <p className="text-xs font-bold">DREW T ERNST</p>
+        {/* Header */}
+        <header className="h-[130px] border-b border-white/5 flex items-center justify-between px-20 bg-black/40 backdrop-blur-3xl z-40 relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] to-transparent pointer-events-none" />
+          <div className="flex items-center gap-12">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-5 hover:bg-white/5 rounded-[22px] transition-all text-white/20 hover:text-accent border border-transparent hover:border-white/5 active:scale-95 shadow-2xl"
+            >
+              {sidebarOpen ? <X size={28} /> : <Menu size={28} />}
+            </button>
+            <div className="h-12 w-px bg-white/10" />
+            <div className="hidden xl:flex flex-col">
+              <div className="flex items-center gap-4 text-[12px] font-tech text-accent/80 tracking-[0.5em] uppercase">
+                <ShieldCheck size={18} className="text-accent" />
+                <span>Encrypted Member Line</span>
+              </div>
+              <p className="text-[11px] font-mono text-white/20 uppercase mt-2.5 tracking-widest flex items-center gap-3">
+                <Activity size={14} className="text-accent/40" />
+                UPLINK ACTIVE: AUGUSTA-ALPHA-8
+              </p>
             </div>
-            <div className="w-10 h-10 rounded-full border border-[#00ffcc]/20 bg-white/5 flex items-center justify-center font-black text-[10px]">
-              DE
+          </div>
+
+          <div className="flex items-center gap-12 group cursor-pointer">
+            <div className="text-right hidden sm:block">
+              <p className="text-[11px] font-tech text-white/20 uppercase tracking-[0.6em] mb-2">Authenticated Patron</p>
+              <p className="text-lg font-bold uppercase tracking-tight group-hover:text-accent transition-colors duration-700">{user?.displayName || 'DREW T ERNST'}</p>
+            </div>
+            <div className="relative">
+              <div className="w-16 h-16 rounded-[24px] border border-white/10 bg-accent/[0.02] flex items-center justify-center font-black text-base text-accent transition-all duration-1000 group-hover:border-accent/50 group-hover:shadow-[0_0_50px_rgba(0,255,204,0.3)] group-hover:-rotate-12 ring-1 ring-white/5 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] to-transparent" />
+                {user?.email?.substring(0,2).toUpperCase() || 'DE'}
+              </div>
+              <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 bg-black rounded-xl border-2 border-accent/20 p-1.5 flex items-center justify-center shadow-2xl">
+                <div className="w-full h-full bg-accent rounded-sm animate-pulse" />
+              </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-20 space-y-24">
           
-          {/* Hero Section (Netflix Style) */}
-          {!selectedCourse && (
-            <div className="relative h-[400px] rounded-[40px] overflow-hidden mb-12 border border-white/5 shadow-2xl group">
+          {activeTab === 'weather' ? (
+            <CaddieIntelView location={userLocation} />
+          ) : activeTab === 'ledger' ? (
+            <div className="animate-in fade-in slide-in-from-bottom-12 duration-1000">
+              <div className="flex items-end justify-between mb-16 border-b border-white/5 pb-12">
+                <div>
+                  <h3 className="font-display text-8xl tracking-tighter mb-4 uppercase leading-none text-glow">The Ledger</h3>
+                  <div className="flex items-center gap-6">
+                    <p className="text-[12px] font-tech text-white/20 uppercase tracking-[0.8em]">Championship Round Logs</p>
+                    <div className="h-2 w-2 rounded-full bg-accent/40 shadow-[0_0_15px_rgba(0,255,204,0.5)]" />
+                    <span className="text-[11px] font-mono text-accent uppercase tracking-widest">3 Rounds Verified</span>
+                  </div>
+                </div>
+                <button className="bg-white text-black px-12 py-5 rounded-[30px] font-black uppercase text-xs hover:bg-accent transition-all hover:scale-105 active:scale-95 shadow-3xl">Log Final Score</button>
+              </div>
+              <Scorecard courseName="Pebble Beach Golf Links" date="March 11, 2026" />
+            </div>
+          ) : !selectedCourse && activeTab === 'dashboard' ? (
+            <div className="relative h-[750px] rounded-[100px] overflow-hidden border border-white/10 shadow-[0_80px_160px_rgba(0,0,0,1)] group ring-1 ring-white/5">
               <img 
                 src="https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=1600" 
-                className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-1000"
+                className="w-full h-full object-cover opacity-20 group-hover:scale-110 transition-transform duration-[15s] ease-out grayscale group-hover:grayscale-0"
                 alt="Championship Course"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-              <div className="absolute bottom-12 left-12 max-w-xl">
-                <span className="bg-[#00ffcc] text-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-4 inline-block">Featured Link</span>
-                <h2 className="font-display text-6xl md:text-7xl mb-4 leading-none">PEBBLE BEACH</h2>
-                <p className="text-white/60 mb-8 font-medium">Experience the ultimate in high-fidelity coastal golf. Now accepting elite tier bookings.</p>
-                <button className="bg-white text-black px-10 py-4 rounded-2xl font-black uppercase text-xs hover:bg-[#00ffcc] transition-all">Quick Book</button>
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)]" />
+              
+              <div className="absolute bottom-32 left-24 max-w-5xl animate-in fade-in slide-in-from-bottom-16 duration-[2000ms]">
+                <div className="flex items-center gap-8 mb-12">
+                  <div className="flex items-center gap-4 bg-accent text-black text-[12px] font-black px-10 py-4 rounded-full uppercase tracking-[0.6em] shadow-[0_0_60px_rgba(0,255,204,0.8)]">
+                    <Award size={18} />
+                    CHAIRMAN'S CHOICE
+                  </div>
+                  <div className="flex items-center gap-4 text-[12px] font-tech text-white/40 uppercase tracking-widest border border-white/10 px-10 py-4 rounded-full backdrop-blur-3xl">
+                    <TrendingUp size={22} className="text-accent" />
+                    MEMBER ACCESS: PRIORITY
+                  </div>
+                </div>
+                <h2 className="font-display text-[14rem] md:text-[18rem] mb-12 leading-[0.6] tracking-tighter text-glow opacity-95">PEBBLE BEACH</h2>
+                <p className="text-white/30 mb-20 font-medium text-4xl leading-tight max-w-3xl border-l-2 border-accent/20 pl-16 italic">"The ultimate meeting of land and sea." Access tournament-grade yardage analytics and private member deployment.</p>
+                <div className="flex gap-12">
+                  <button className="bg-white text-black px-24 py-10 rounded-[50px] font-black uppercase text-lg hover:bg-accent transition-all hover:scale-105 active:scale-95 shadow-[0_50px_100px_rgba(0,0,0,0.7)] flex items-center gap-8 group/btn">
+                    Secure Tee Time
+                    <ChevronRight size={28} className="group-hover/btn:translate-x-4 transition-transform duration-700" />
+                  </button>
+                  <button className="bg-white/[0.02] backdrop-blur-3xl text-white px-24 py-10 rounded-[50px] font-black uppercase text-lg border border-white/10 hover:bg-white/10 transition-all flex items-center gap-8">
+                    <Activity size={32} className="text-accent" />
+                    Course Intel
+                  </button>
+                </div>
               </div>
             </div>
+          ) : null}
+
+          {/* Finder Section */}
+          {(activeTab === 'search' || (activeTab === 'dashboard' && !selectedCourse)) && !selectedCourse && (
+            <section className="animate-in fade-in slide-in-from-bottom-16 duration-1000 delay-700">
+              <div className="flex items-end justify-between mb-24 border-b border-white/5 pb-20">
+                <div>
+                  <h3 className="font-display text-9xl tracking-tighter mb-6 uppercase leading-none text-glow">The Links</h3>
+                  <div className="flex items-center gap-10">
+                    <p className="text-[13px] font-tech text-white/20 uppercase tracking-[1em]">Championship Network Finder</p>
+                    <div className="h-2.5 w-2.5 rounded-full bg-accent/30" />
+                    <span className="text-[12px] font-mono text-accent/80 uppercase tracking-[0.3em] font-black">{courses.length} ELITE DESTINATIONS ONLINE</span>
+                  </div>
+                </div>
+                <div className="flex gap-12 items-center">
+                  <div className="flex gap-8 items-center bg-white/[0.01] border border-white/5 p-6 rounded-[45px] shadow-4xl ring-1 ring-white/5">
+                    <span className="text-[12px] font-tech text-white/20 px-10 uppercase tracking-[0.5em]">Radius Scanner</span>
+                    <input 
+                      type="range" min="5" max="100" value={searchRadius} 
+                      onChange={(e) => setSearchRadius(Number(e.target.value))}
+                      className="accent-accent w-80 h-2.5 bg-white/10 rounded-full appearance-none cursor-pointer"
+                    />
+                    <span className="text-[16px] font-mono text-accent px-10 font-black">{searchRadius} MI</span>
+                  </div>
+                  <button className="p-10 bg-white/[0.01] border border-white/5 rounded-[45px] hover:border-accent/50 transition-all text-white/20 hover:text-accent shadow-4xl group ring-1 ring-white/5">
+                    <Filter size={40} className="group-hover:rotate-180 transition-transform duration-1000" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-20 pb-60">
+                {loading && !courses.length ? (
+                  [1,2,3].map(i => (
+                    <div key={i} className="aspect-[4/5] bg-white/[0.01] rounded-[100px] border border-white/5 animate-pulse p-20 flex flex-col gap-12" />
+                  ))
+                ) : (
+                  courses.map(course => (
+                    <CourseCard key={course.id} course={course} onClick={() => handleCourseSelect(course)} />
+                  ))
+                )}
+              </div>
+            </section>
           )}
 
-          {/* Dynamic Grid */}
-          <section>
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="font-display text-4xl">MAJESTIC LINKS</h3>
-              <div className="flex gap-2">
-                <button className="p-2 border border-white/5 rounded-lg hover:border-[#00ffcc]/30 transition-all text-white/40 hover:text-[#00ffcc]"><Filter size={16} /></button>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {[1,2,3].map(i => <div key={i} className="aspect-video bg-white/5 rounded-3xl animate-pulse" />)}
-              </div>
-            ) : selectedCourse ? (
-              <TeeTimeView course={selectedCourse} teeTimes={teeTimes} onBack={() => setSelectedCourse(null)} />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {courses.map(course => (
-                  <CourseCard key={course.id} course={course} onClick={() => handleCourseSelect(course)} />
-                ))}
-              </div>
-            )}
-          </section>
+          {selectedCourse && (
+            <TeeTimeView course={selectedCourse} teeTimes={teeTimes} onBack={() => setSelectedCourse(null)} onBook={handleBooking} loading={loading} />
+          )}
         </div>
       </main>
     </div>
   );
 }
 
+const CaddieIntelView = ({ location }: any) => (
+  <div className="animate-in fade-in slide-in-from-bottom-12 duration-1000">
+    <div className="flex items-end justify-between mb-20 border-b border-white/5 pb-16">
+      <div>
+        <h3 className="font-display text-9xl tracking-tighter mb-6 uppercase leading-none text-glow">Caddie Intel</h3>
+        <div className="flex items-center gap-10">
+          <p className="text-[13px] font-tech text-white/20 uppercase tracking-[1em]">Real-Time Sector Analysis</p>
+          <div className="h-2.5 w-2.5 rounded-full bg-accent/30 shadow-[0_0_20px_rgba(0,255,204,0.5)]" />
+          <span className="text-[12px] font-mono text-accent uppercase tracking-[0.3em] font-black">Augusta Grade Precision</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 bg-accent/5 border border-accent/20 px-8 py-4 rounded-[30px] shadow-[0_0_30px_rgba(0,255,204,0.1)]">
+        <Flower2 size={24} className="text-accent animate-pulse" />
+        <div className="flex flex-col">
+          <span className="text-[10px] font-tech text-white/40 uppercase tracking-widest leading-none">Flora Status</span>
+          <span className="text-[11px] font-bold text-accent uppercase mt-1 tracking-tighter">Azaleas in Peak Bloom • Amen Corner Open</span>
+        </div>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      <IntelCard 
+        icon={<Wind size={32} className="text-accent" />} 
+        label="Atmospheric Drift" 
+        value="12 MPH" 
+        subValue="Direction: NE (CROSS-WIND)" 
+        trend="GUSTS UP TO 18 MPH"
+      />
+      <IntelCard 
+        icon={<Waves size={32} className="text-accent" />} 
+        label="Surface Integrity" 
+        value="STIMP 13.5" 
+        subValue="Firmness: High (Tournament Ready)" 
+        trend="MOISTURE: 4% AT ROOT"
+      />
+      <IntelCard 
+        icon={<Zap size={32} className="text-accent" />} 
+        label="Playability Index" 
+        value="98 / 100" 
+        subValue="Elite Tier Deployment Status" 
+        trend="CONDITION: OPTIMAL"
+      />
+    </div>
+
+    <div className="mt-20 glass-surface rounded-[80px] p-20 border border-white/10 relative overflow-hidden shadow-4xl ring-1 ring-white/5">
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/[0.02] blur-[150px] rounded-full translate-x-1/2 -translate-y-1/2" />
+      <div className="relative z-10">
+        <div className="flex items-center gap-6 mb-10">
+          <h4 className="font-display text-6xl uppercase tracking-tight text-white/80">Pro Scout Report</h4>
+          <div className="h-px flex-1 bg-white/5" />
+          <span className="text-[10px] font-mono text-accent/40 uppercase tracking-widest">TS-Augusta-Verified</span>
+        </div>
+        <p className="text-3xl font-medium text-white/40 leading-relaxed max-w-5xl border-l-4 border-accent/20 pl-16 italic">
+          "Course conditions are currently mimicking early Sunday at Augusta. Green speeds are peak, requiring precise approach landing angles. Wind drift will affect high-lofted deployments significantly between holes 11 and 13. Maintain high-fidelity focus on short-game touch. Amen Corner is playing firm and fast."
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
+const IntelCard = ({ icon, label, value, subValue, trend }: any) => (
+  <div className="glass-surface rounded-[60px] p-16 border border-white/5 hover:border-accent/30 transition-all duration-700 hover:shadow-[0_40px_80px_rgba(0,0,0,0.8)] group">
+    <div className="w-20 h-20 bg-white/[0.02] rounded-3xl flex items-center justify-center mb-10 group-hover:scale-110 transition-transform duration-500 border border-white/5 group-hover:border-accent/20 group-hover:bg-accent/5">
+      {icon}
+    </div>
+    <p className="text-[11px] font-tech text-white/20 uppercase tracking-[0.5em] mb-4">{label}</p>
+    <p className="text-7xl font-display text-white font-black tracking-tight mb-6 group-hover:text-accent transition-colors">{value}</p>
+    <div className="space-y-2 border-t border-white/5 pt-8">
+      <p className="text-[10px] font-mono text-white/40 uppercase tracking-widest">{subValue}</p>
+      <p className="text-[10px] font-mono text-accent uppercase tracking-widest font-black">{trend}</p>
+    </div>
+  </div>
+);
+
+const Scorecard = ({ courseName, date }: any) => (
+  <div className="glass-surface rounded-[80px] p-20 border border-white/10 relative overflow-hidden shadow-[0_80px_160px_rgba(0,0,0,0.9)] ring-1 ring-white/5">
+    <div className="flex items-center justify-between mb-16">
+      <div>
+        <h4 className="text-6xl font-display uppercase tracking-tight text-white mb-4">{courseName}</h4>
+        <div className="flex items-center gap-6">
+          <p className="text-[12px] font-tech text-white/20 uppercase tracking-[0.6em]">{date} • 18 HOLES CHAMPIONSHIP</p>
+          <div className="h-1.5 w-1.5 rounded-full bg-accent/20" />
+          <span className="text-[11px] font-mono text-accent/60 uppercase tracking-[0.2em]">Tournament Verified Scorecard</span>
+        </div>
+      </div>
+      <div className="flex gap-12 bg-white/[0.02] p-8 rounded-[40px] border border-white/5">
+        <div className="text-center px-8">
+          <p className="text-[11px] font-tech text-white/20 uppercase tracking-widest mb-3">Total Score</p>
+          <p className="text-7xl font-display text-accent font-black tracking-tighter text-glow">-2</p>
+        </div>
+        <div className="text-center border-l border-white/10 px-8">
+          <p className="text-[11px] font-tech text-white/20 uppercase tracking-widest mb-3">Thru Hole</p>
+          <p className="text-7xl font-display text-white font-black tracking-tighter">18</p>
+        </div>
+      </div>
+    </div>
+
+    <div className="overflow-x-auto custom-scrollbar pb-12">
+      <div className="inline-flex gap-6 min-w-full">
+        {Array.from({ length: 18 }).map((_, i) => (
+          <div key={i} className="w-32 shrink-0 bg-white/[0.01] border border-white/5 rounded-[40px] p-10 text-center hover:bg-accent/[0.03] hover:border-accent/30 transition-all duration-700 group cursor-pointer hover:shadow-2xl">
+            <p className="text-[11px] font-tech text-white/20 uppercase tracking-[0.3em] mb-6 group-hover:text-accent transition-colors">Hole {i + 1}</p>
+            <p className="text-5xl font-display text-white font-black group-hover:scale-125 transition-transform leading-none mb-6 group-hover:text-glow">4</p>
+            <div className="space-y-2 border-t border-white/5 pt-6 opacity-40 group-hover:opacity-100 transition-opacity">
+              <p className="text-[10px] font-mono text-white uppercase tracking-tighter font-bold">PAR 4</p>
+              <p className="text-[10px] font-mono text-accent uppercase tracking-tighter font-black">412 YDS</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 const NavItem = ({ icon, label, active, expanded, onClick }: any) => (
   <button 
     onClick={onClick}
     className={cn(
-      "flex items-center gap-4 w-full p-4 rounded-2xl transition-all duration-300 group",
-      active ? "bg-[#00ffcc]/10 text-[#00ffcc] border border-[#00ffcc]/20" : "text-white/40 hover:text-white hover:bg-white/5 border border-transparent"
+      "flex items-center gap-8 w-full p-8 rounded-[40px] transition-all duration-700 group relative overflow-hidden",
+      active ? "bg-accent/10 text-accent border border-accent/20 shadow-[0_0_80px_rgba(0,255,204,0.25)]" : "text-white/20 hover:text-white hover:bg-white/[0.03] border border-transparent"
     )}
   >
-    <div className={cn("shrink-0", active ? "text-[#00ffcc]" : "group-hover:text-white")}>{icon}</div>
+    {active && <div className="absolute left-0 w-3 h-14 bg-accent rounded-r-full shadow-[10px_0_50px_rgba(0,255,204,1)]" />}
+    <div className={cn("shrink-0 transition-all duration-700", active ? "text-accent scale-125 rotate-6" : "group-hover:text-white group-hover:translate-x-3")}>{icon}</div>
     {expanded && (
-      <span className="text-[11px] font-black uppercase tracking-widest overflow-hidden whitespace-nowrap">{label}</span>
+      <span className="text-[17px] font-black uppercase tracking-[0.4em] overflow-hidden whitespace-nowrap">{label}</span>
     )}
   </button>
 );
@@ -337,58 +562,138 @@ const NavItem = ({ icon, label, active, expanded, onClick }: any) => (
 const CourseCard = ({ course, onClick }: any) => (
   <div 
     onClick={onClick}
-    className="glass-card group cursor-pointer border border-white/5 hover:border-[#00ffcc]/30 hover:bg-[#080808] transition-all"
+    className="group cursor-pointer glass-surface rounded-[80px] overflow-hidden transition-all duration-1000 hover:border-accent/50 hover:shadow-[0_100px_200px_rgba(0,0,0,1)] hover:translate-y-[-24px] kinetic-border"
   >
-    <div className="aspect-video overflow-hidden rounded-t-[24px] relative">
-      <img src={course.photoUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-80 group-hover:opacity-100" alt={course.name} />
-      <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 flex items-center gap-2">
-        <Star size={10} className="text-yellow-500 fill-yellow-500" />
-        <span className="text-[10px] font-bold">{course.rating}</span>
+    <div className="aspect-[4/3] overflow-hidden relative">
+      <img 
+        src={course.photoUrl || 'https://images.unsplash.com/photo-1592919505780-303950717480?w=800'} 
+        className="w-full h-full object-cover group-hover:scale-150 transition-transform duration-[10s] opacity-30 group-hover:opacity-100 grayscale group-hover:grayscale-0" 
+        alt={course.name} 
+      />
+      <div className="absolute top-12 right-12 bg-black/90 backdrop-blur-3xl px-10 py-4 rounded-full border border-white/10 flex items-center gap-6 shadow-4xl">
+        <Star size={24} className="text-yellow-500 fill-yellow-500" />
+        <span className="text-[18px] font-black tracking-tighter">{course.rating || '4.5'}</span>
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+      <div className="absolute bottom-12 left-12">
+        <div className="bg-accent/30 backdrop-blur-3xl px-8 py-3.5 rounded-[30px] border border-accent/50 flex items-center gap-5 shadow-3xl">
+          <MapPin size={24} className="text-accent" />
+          <span className="text-[16px] font-mono text-white font-black tracking-tight uppercase">{course.distance} MILES OUT</span>
+        </div>
       </div>
     </div>
-    <div className="p-6">
-      <h4 className="font-display text-2xl mb-1 group-hover:text-[#00ffcc] transition-colors">{course.name}</h4>
-      <p className="text-[10px] font-tech text-white/30 uppercase tracking-widest mb-4">{course.city}, {course.state}</p>
-      <div className="flex justify-between items-center text-[10px] font-mono text-white/40">
-        <div className="flex items-center gap-2">
-          <MapPin size={12} className="text-[#00ffcc]" />
-          <span>{course.distance} MI</span>
+    <div className="p-20">
+      <h4 className="font-display text-7xl mb-6 group-hover:text-accent transition-colors duration-1000 leading-none tracking-tight uppercase text-glow">{course.name}</h4>
+      <div className="flex items-center gap-6 text-[14px] font-tech text-white/20 uppercase tracking-[0.8em] mb-16 border-l-2 border-accent/20 pl-10">
+        {course.city}, {course.state}
+      </div>
+      <div className="flex justify-between items-center text-[12px] font-mono text-white/10 uppercase tracking-[0.6em] border-t border-white/5 pt-16">
+        <div className="flex items-center gap-5 bg-white/[0.03] px-8 py-4 rounded-3xl border border-white/5">
+          <span className="text-accent font-black text-2xl">18</span>
+          <span>Holes</span>
         </div>
-        <span>{course.holes} HOLES • PAR {course.par}</span>
+        <div className="flex items-center gap-5">
+          <span className="text-white/20">TOURNAMENT PAR</span>
+          <span className="text-white font-black text-4xl">{course.par || 72}</span>
+        </div>
       </div>
     </div>
   </div>
 );
 
-const TeeTimeView = ({ course, teeTimes, onBack }: any) => (
-  <div className="animate-in fade-in duration-500">
-    <button onClick={onBack} className="mb-8 text-[10px] font-tech text-[#00ffcc] uppercase tracking-[0.3em] flex items-center gap-2 hover:translate-x-[-4px] transition-all">
-      &larr; Back to Dashboard
-    </button>
-    <div className="bg-[#080808] rounded-[40px] border border-white/5 p-10 mb-8">
-      <h2 className="font-display text-5xl mb-4">{course.name}</h2>
-      <div className="flex gap-6 text-white/40 text-[10px] font-tech uppercase tracking-widest">
-        <div className="flex items-center gap-2"><MapPin size={14} className="text-[#00ffcc]" /> {course.address}</div>
-        <div className="flex items-center gap-2"><Phone size={14} /> {course.phone || 'N/A'}</div>
+const TeeTimeView = ({ course, teeTimes, onBack, onBook, loading }: any) => (
+  <div className="animate-in fade-in duration-1000 slide-in-from-right-20">
+    <button 
+      onClick={onBack} 
+      className="mb-24 text-[16px] font-tech text-accent uppercase tracking-[1em] flex items-center gap-10 hover:translate-x-[-20px] transition-all group"
+    >
+      <div className="bg-accent/10 p-6 rounded-[40px] group-hover:bg-accent/20 transition-colors border border-accent/20 shadow-4xl">
+        <ChevronRight size={40} className="rotate-180" />
       </div>
-    </div>
-    <div className="space-y-4">
-      {teeTimes.map((t: any) => (
-        <div key={t.id} className="bg-white/5 border border-white/5 p-6 rounded-[24px] flex items-center justify-between hover:border-[#00ffcc]/20 transition-all">
-          <div className="flex items-center gap-8">
-            <div className="text-center">
-              <Clock size={16} className="text-[#00ffcc] mb-1 mx-auto" />
-              <div className="font-display text-2xl tracking-tighter">{t.time}</div>
+      Return to Global Network
+    </button>
+    
+    <div className="glass-surface rounded-[120px] p-40 mb-32 relative overflow-hidden ring-1 ring-white/10 shadow-[0_120px_240px_rgba(0,0,0,1)]">
+      <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-accent/[0.05] blur-[300px] rounded-full translate-x-1/2 -translate-y-1/2" />
+      <div className="relative z-10">
+        <div className="flex items-start justify-between mb-24">
+          <div className="space-y-16">
+            <div className="flex items-center gap-10">
+              <span className="bg-accent text-black px-12 py-5 rounded-full border border-accent/20 font-black text-[14px] tracking-[0.8em] uppercase shadow-[0_0_80px_rgba(0,255,204,0.6)]">CHAMPIONSHIP DEPLOYMENT SECURED</span>
+              <div className="flex items-center gap-6 text-[14px] font-tech text-white/30 uppercase tracking-[0.6em]">
+                <ShieldCheck size={28} className="text-accent" />
+                Patron Access Verified
+              </div>
             </div>
-            <div className="h-10 w-px bg-white/10" />
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-white/40 uppercase"><Users size={12} /> {t.availableSlots} SLOTS</div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-[#00ffcc] uppercase"><DollarSign size={12} /> ${t.price} PER PLAYER</div>
+            <h2 className="font-display text-[15rem] md:text-[20rem] mb-16 tracking-[calc(-0.08em)] leading-[0.65] uppercase text-glow shadow-accent">{course.name}</h2>
+            <div className="flex flex-wrap gap-20 text-white/40 text-[16px] font-tech uppercase tracking-[0.8em] items-center mt-16">
+              <div className="flex items-center gap-8 bg-white/[0.02] px-12 py-6 rounded-[45px] border border-white/5 shadow-3xl"><MapPin size={36} className="text-accent" /> {course.address}</div>
+              <div className="flex items-center gap-8 bg-white/[0.02] px-12 py-6 rounded-[45px] border border-white/5 shadow-3xl"><Phone size={34} className="text-accent" /> {course.phone || 'ENCRYPTED MEMBER LINE'}</div>
             </div>
           </div>
-          <button className="bg-[#00ffcc] text-black px-8 py-3 rounded-xl font-black uppercase text-[10px] hover:scale-105 transition-all">Reserve Slot</button>
         </div>
-      ))}
+      </div>
+    </div>
+
+    <div className="space-y-16 max-w-[1600px] pb-80">
+      <div className="flex items-center gap-16 mb-24">
+        <div className="h-px flex-1 bg-white/5" />
+        <h3 className="text-[16px] font-tech text-white/20 uppercase tracking-[1.5em] flex items-center gap-10">
+          <Clock size={36} className="text-accent" />
+          AVAILABLE START TIMES
+        </h3>
+        <div className="h-px flex-1 bg-white/5" />
+      </div>
+      
+      {loading ? (
+        [1,2,3,4].map(i => <div key={i} className="h-60 bg-white/[0.01] rounded-[100px] animate-pulse" />)
+      ) : teeTimes.length > 0 ? (
+        teeTimes.map((t: any) => (
+          <div 
+            key={t.id} 
+            className="group bg-white/[0.01] backdrop-blur-[200px] border border-white/5 p-20 rounded-[100px] flex items-center justify-between hover:border-accent/50 hover:bg-white/[0.03] transition-all duration-1000 shadow-[0_80px_160px_rgba(0,0,0,0.7)] ring-1 ring-white/5 hover:translate-x-12 relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-accent/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+            <div className="flex items-center gap-40 relative z-10">
+              <div className="text-center group-hover:scale-110 transition-transform duration-1000">
+                <div className="text-[15px] font-tech text-white/20 uppercase tracking-[0.8em] mb-8">Start Time</div>
+                <div className="font-display text-[14rem] tracking-[calc(-0.05em)] text-accent group-hover:text-white transition-colors leading-none">{t.time}</div>
+              </div>
+              <div className="h-48 w-px bg-white/10" />
+              <div className="grid grid-cols-2 gap-x-32 gap-y-12">
+                <div className="space-y-6">
+                  <div className="text-[14px] font-tech text-white/20 uppercase tracking-[0.6em]">Open Slots</div>
+                  <div className="flex items-center gap-8 text-4xl font-mono text-white/60 uppercase tracking-tighter">
+                    <Users size={40} className="text-accent" /> 
+                    <span className="font-black">{t.availableSlots} Players</span>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div className="text-[14px] font-tech text-white/20 uppercase tracking-[0.6em]">Green Fee</div>
+                  <div className="flex items-center gap-8 text-4xl font-mono text-accent uppercase font-black tracking-tighter">
+                    <DollarSign size={40} /> 
+                    <span>${t.price} <span className="text-[14px] text-white/20 ml-4">PER ROUND</span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button 
+              onClick={() => onBook(t)}
+              className="bg-accent text-black px-32 py-12 rounded-[60px] font-black uppercase text-xl hover:bg-white hover:scale-105 active:scale-95 transition-all shadow-[0_50px_120px_rgba(0,255,204,0.6)] hover:shadow-[0_60px_180px_rgba(255,255,255,0.2)] flex items-center gap-10 group/btn relative z-10"
+            >
+              Confirm Round
+              <ChevronRight size={40} className="group-hover/btn:translate-x-6 transition-transform duration-1000" />
+            </button>
+          </div>
+        ))
+      ) : (
+        <div className="glass-surface p-60 rounded-[120px] text-center border-dashed border-white/10 shadow-5xl">
+          <div className="w-32 h-32 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-16 shadow-3xl">
+            <Lock size={50} className="text-white/20" />
+          </div>
+          <p className="text-white/20 font-tech uppercase tracking-[1.5em] text-2xl">Member booking offline for this window</p>
+        </div>
+      )}
     </div>
   </div>
 );

@@ -3,8 +3,19 @@
  * How to connect Golf Booking App to your Fluff app
  */
 
-import { db, auth } from './firebase'; // Your existing Fluff Firebase
-import { doc, setDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase'; // Updated import from src/firebase.ts
+import { 
+  doc, 
+  setDoc, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  orderBy, 
+  getDocs, 
+  increment 
+} from 'firebase/firestore';
 
 // ==========================================
 // INTEGRATION POINT 1: Save Booking to Fluff
@@ -20,15 +31,18 @@ interface BookingData {
   holes: number;
 }
 
-export async function saveBookingToFluff(booking: BookingData) {
+export async function saveBookingToClubhouse(booking: BookingData) {
   const userId = auth.currentUser?.uid;
   
   if (!userId) {
-    throw new Error('User not authenticated');
+    // For development, we'll allow mock bookings or throw an error
+    console.warn('User not authenticated - using guest account for booking');
+    // return 'guest-booking-id'; 
+    throw new Error('User not authenticated. Please log in to the Clubhouse.');
   }
 
   try {
-    // Add to user's upcoming rounds in Fluff
+    // Add to user's upcoming rounds in the Clubhouse Project Firestore
     const roundRef = await addDoc(collection(db, 'rounds'), {
       userId,
       courseName: booking.courseName,
@@ -39,24 +53,37 @@ export async function saveBookingToFluff(booking: BookingData) {
       bookedPrice: booking.price,
       status: 'scheduled',
       createdAt: new Date().toISOString(),
-      source: 'fluff-booking-app'
+      source: 'clubhouse-web-app'
     });
 
-    // Update user's stats
-    await updateDoc(doc(db, 'users', userId), {
+    // Update user's stats in Firestore
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
       'stats.upcomingRounds': increment(1),
       lastBooking: new Date().toISOString()
+    }).catch(async (err) => {
+      // If user document doesn't exist, create it
+      if (err.code === 'not-found') {
+        await setDoc(userRef, {
+          uid: userId,
+          email: auth.currentUser?.email,
+          stats: { upcomingRounds: 1 },
+          lastBooking: new Date().toISOString()
+        });
+      } else {
+        throw err;
+      }
     });
 
     return roundRef.id;
-  } catch (error) {
-    console.error('Error saving booking to Fluff:', error);
+  } catch (error: any) {
+    console.error('Error saving booking:', error);
     throw error;
   }
 }
 
 // ==========================================
-// INTEGRATION POINT 2: Sync Course to Fluff
+// INTEGRATION POINT 2: Sync Course to Clubhouse
 // ==========================================
 
 interface CourseData {
@@ -72,24 +99,24 @@ interface CourseData {
   par?: number;
 }
 
-export async function saveCourseToFluff(course: CourseData) {
+export async function saveCourseToClubhouse(course: CourseData) {
   try {
-    // Save course to Fluff's course database
+    // Save course to Clubhouse's course database
     await setDoc(doc(db, 'courses', course.id), {
       ...course,
       addedAt: new Date().toISOString(),
-      source: 'booking-app'
-    });
+      source: 'clubhouse-web-app'
+    }, { merge: true });
   } catch (error) {
-    console.error('Error saving course to Fluff:', error);
+    console.error('Error saving course:', error);
   }
 }
 
 // ==========================================
-// INTEGRATION POINT 3: Update Fluff Dashboard
+// INTEGRATION POINT 3: Update Clubhouse Dashboard
 // ==========================================
 
-export async function syncFluffDashboard(userId: string) {
+export async function syncClubhouseDashboard(userId: string) {
   try {
     // Fetch upcoming rounds
     const roundsQuery = query(
@@ -107,7 +134,7 @@ export async function syncFluffDashboard(userId: string) {
       'dashboard.lastSync': new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error syncing Fluff dashboard:', error);
+    console.error('Error syncing dashboard:', error);
   }
 }
 
@@ -115,7 +142,7 @@ export async function syncFluffDashboard(userId: string) {
 // INTEGRATION POINT 4: Booking Flow Handler
 // ==========================================
 
-export async function handleFluffBooking(
+export async function handleClubhouseBooking(
   teeTime: any,
   course: any,
   playerCount: number
@@ -132,23 +159,25 @@ export async function handleFluffBooking(
       holes: teeTime.holes
     };
 
-    // 2. Save booking to Fluff database
-    const roundId = await saveBookingToFluff(booking);
+    // 2. Save booking to Clubhouse database
+    const roundId = await saveBookingToClubhouse(booking);
 
     // 3. Save course data if not already exists
-    await saveCourseToFluff(course);
+    await saveCourseToClubhouse(course);
 
     // 4. Update dashboard
-    await syncFluffDashboard(auth.currentUser!.uid);
+    if (auth.currentUser) {
+      await syncClubhouseDashboard(auth.currentUser.uid);
+    }
 
     // 5. Return success
     return {
       success: true,
       roundId,
-      message: 'Booking saved to Fluff Golf Assistant!'
+      message: 'Booking saved to The Clubhouse!'
     };
 
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.message
@@ -156,107 +185,4 @@ export async function handleFluffBooking(
   }
 }
 
-// ==========================================
-// USAGE IN GOLF BOOKING COMPONENT
-// ==========================================
-
-/*
-In your GolfBookingApp.tsx, replace the handleBooking function:
-
-const handleBooking = async (teeTime: TeeTime) => {
-  if (!selectedCourse) return;
-  
-  setLoading(true);
-  
-  try {
-    // Call Fluff integration
-    const result = await handleFluffBooking(
-      teeTime,
-      selectedCourse,
-      playerCount
-    );
-    
-    if (result.success) {
-      // Show success message
-      alert(`✅ Booked Successfully!\n\nYour round has been added to Fluff Golf Assistant.\n\nRound ID: ${result.roundId}`);
-      
-      // Optionally redirect to Fluff app
-      // window.location.href = '/fluff-dashboard';
-    } else {
-      throw new Error(result.error);
-    }
-  } catch (error) {
-    alert(`❌ Booking Failed: ${error.message}`);
-  } finally {
-    setLoading(false);
-  }
-};
-*/
-
-// ==========================================
-// HELPER: Increment Firestore Field
-// ==========================================
-
-import { increment } from 'firebase/firestore';
-
-// Already imported above, but shown here for reference
-// Use increment() when updating numeric fields
-
-// ==========================================
-// EXAMPLE: Complete Integration
-// ==========================================
-
-/*
-Full example of integrated booking flow:
-
-1. User searches courses (Golf Booking App)
-2. User selects course and tee time
-3. User clicks "Book Now"
-4. handleFluffBooking() is called
-5. Round is saved to Fluff database
-6. Course is saved to Fluff courses collection
-7. User's dashboard is updated
-8. User sees confirmation
-9. User can view booking in Fluff app
-*/
-
-// ==========================================
-// FIRESTORE STRUCTURE FOR FLUFF INTEGRATION
-// ==========================================
-
-/*
-/rounds/{roundId}
-  - userId: string
-  - courseName: string
-  - date: string (YYYY-MM-DD)
-  - teeTime: string (HH:MM AM/PM)
-  - scheduledPlayers: number
-  - holes: number
-  - bookedPrice: number
-  - status: 'scheduled' | 'completed' | 'cancelled'
-  - createdAt: timestamp
-  - source: 'fluff-booking-app'
-
-/courses/{courseId}
-  - name: string
-  - address: string
-  - city: string
-  - state: string
-  - latitude: number
-  - longitude: number
-  - rating: number (optional)
-  - holes: number (optional)
-  - par: number (optional)
-  - addedAt: timestamp
-  - source: 'booking-app'
-
-/users/{userId}
-  - stats:
-      - upcomingRounds: number
-  - dashboard:
-      - upcomingRounds: number
-      - lastSync: timestamp
-  - lastBooking: timestamp
-*/
-
-export default handleFluffBooking;
+export default handleClubhouseBooking;
