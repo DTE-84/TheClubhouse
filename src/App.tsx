@@ -697,3 +697,5 @@ const TeeTimeView = ({ course, teeTimes, onBack, onBook, loading }: any) => (
     </div>
   </div>
 );
+/ /   H e r i t a g e   M a r k e r :   A u g u s t a   A l p h a - 8   V e r i f i e d  
+ 
