@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   MapPin, 
   Calendar, 
@@ -46,7 +46,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function App() {
-  // ── SYSTEM STATE ──
+  // â”€â”€ SYSTEM STATE â”€â”€
   const [user, setUser] = useState<User | null>(null);
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,12 +54,12 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // ── DATA STATE ──
+  // â”€â”€ DATA STATE â”€â”€
   const [courses, setCourses] = useState<GolfCourse[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<GolfCourse | null>(null);
   const [teeTimes, setTeeTimes] = useState<TeeTime[]>([]);
   
-  // ── FILTER STATE ──
+  // â”€â”€ FILTER STATE â”€â”€
   const [searchRadius, setSearchRadius] = useState(25);
   const [maxPrice, setMaxPrice] = useState(150);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -181,12 +181,12 @@ export default function App() {
     try {
       const result = await handleClubhouseBooking(teeTime, selectedCourse, playerCount);
       if (result.success) {
-        alert(`✅ Reservation Confirmed: Your round at ${selectedCourse.name} is secured.`);
+        alert(`âœ… Reservation Confirmed: Your round at ${selectedCourse.name} is secured.`);
       } else {
         throw new Error(result.error);
       }
     } catch (err: any) {
-      alert(`❌ Booking Error: ${err.message}`);
+      alert(`âŒ Booking Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -195,7 +195,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#000000] text-white font-space mesh-bg">
       
-      {/* ── THE CLUBHOUSE SIDEBAR ── */}
+      {/* â”€â”€ THE CLUBHOUSE SIDEBAR â”€â”€ */}
       <aside className={cn(
         "glass-surface flex flex-col transition-all duration-700 z-50 border-r border-white/5",
         sidebarOpen ? "w-[360px]" : "w-[120px]"
@@ -219,7 +219,7 @@ export default function App() {
               <Award className="text-yellow-500 w-5 h-5 shadow-[0_0_15px_rgba(234,179,8,0.4)]" />
               <div className="flex flex-col">
                 <span className="text-[9px] font-tech text-white/40 uppercase tracking-widest leading-none">Heritage Status</span>
-                <span className="text-[10px] font-bold text-yellow-500/90 uppercase mt-1 tracking-tighter">Augusta Circle • 8x Patron</span>
+                <span className="text-[10px] font-bold text-yellow-500/90 uppercase mt-1 tracking-tighter">Augusta Circle â€¢ 8x Patron</span>
               </div>
             </div>
           )}
@@ -278,7 +278,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* â”€â”€ MAIN CONTENT â”€â”€ */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
         {/* Header */}
@@ -444,7 +444,7 @@ const CaddieIntelView = ({ location }: any) => (
         <Flower2 size={24} className="text-accent animate-pulse" />
         <div className="flex flex-col">
           <span className="text-[10px] font-tech text-white/40 uppercase tracking-widest leading-none">Flora Status</span>
-          <span className="text-[11px] font-bold text-accent uppercase mt-1 tracking-tighter">Azaleas in Peak Bloom • Amen Corner Open</span>
+          <span className="text-[11px] font-bold text-accent uppercase mt-1 tracking-tighter">Azaleas in Peak Bloom â€¢ Amen Corner Open</span>
         </div>
       </div>
     </div>
@@ -509,7 +509,7 @@ const Scorecard = ({ courseName, date }: any) => (
       <div>
         <h4 className="text-6xl font-display uppercase tracking-tight text-white mb-4">{courseName}</h4>
         <div className="flex items-center gap-6">
-          <p className="text-[12px] font-tech text-white/20 uppercase tracking-[0.6em]">{date} • 18 HOLES CHAMPIONSHIP</p>
+          <p className="text-[12px] font-tech text-white/20 uppercase tracking-[0.6em]">{date} â€¢ 18 HOLES CHAMPIONSHIP</p>
           <div className="h-1.5 w-1.5 rounded-full bg-accent/20" />
           <span className="text-[11px] font-mono text-accent/60 uppercase tracking-[0.2em]">Tournament Verified Scorecard</span>
         </div>
@@ -697,5 +697,3 @@ const TeeTimeView = ({ course, teeTimes, onBack, onBook, loading }: any) => (
     </div>
   </div>
 );
-/ /   H e r i t a g e   M a r k e r :   A u g u s t a   A l p h a - 8   V e r i f i e d  
- 
