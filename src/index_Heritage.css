@@ -1,0 +1,65 @@
+@tailwind base;
+@theme {
+  --color-kinetic-teal: #00ffcc;
+  --color-obsidian: #000000;
+  --color-charcoal: #080808;
+  --color-lux-gray: #121212;
+}
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #000000;
+    --color-text: #ffffff;
+    --color-accent: #00ffcc;
+  }
+
+  body {
+    @apply bg-black text-white selection:bg-accent/30 selection:text-white antialiased overflow-x-hidden;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv03";
+  }
+}
+
+@layer components {
+  .glass-surface {
+    @apply bg-white/[0.02] backdrop-blur-3xl border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)];
+  }
+
+  .kinetic-border {
+    @apply relative after:absolute after:inset-0 after:rounded-[inherit] after:border after:border-white/5 after:pointer-events-none;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-accent/40 transition-all;
+  }
+}
+
+/* Cinematic Background Gradient */
+.mesh-bg {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 255, 204, 0.03) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(0, 255, 204, 0.02) 0px, transparent 50%);
+}
+
+.font-display {
+  font-family: 'Bebas Neue', cursive;
+  letter-spacing: -0.02em;
+}
+
+.font-tech {
+  font-family: 'Jura', sans-serif;
+  letter-spacing: 0.2em;
+}
