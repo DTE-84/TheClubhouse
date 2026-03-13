@@ -15,6 +15,8 @@ export default {
         accent: '#00ffcc',
         obsidian: '#000000',
         charcoal: '#080808',
+        'kinetic-teal': '#00ffcc',
+        'lux-gray': '#121212',
       },
       animation: {
         'pulse-slow': 'pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
