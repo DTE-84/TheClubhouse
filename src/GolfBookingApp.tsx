@@ -1,43 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Calendar, DollarSign, Users, Navigation, Filter, Star, Clock, Phone, Globe, ChevronRight } from 'lucide-react';
-
-// Types
-interface GolfCourse {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  latitude: number;
-  longitude: number;
-  phone?: string;
-  website?: string;
-  rating?: number;
-  holes?: number;
-  par?: number;
-  distance?: number; // Distance from user in miles
-  photoUrl?: string;
-}
-
-interface TeeTime {
-  id: string;
-  courseId: string;
-  time: string;
-  date: string;
-  availableSlots: number;
-  price: number;
-  holes: number;
-}
-
-interface UserLocation {
-  latitude: number;
-  longitude: number;
-}
+import { golfAPI, GolfCourse, TeeTime, SearchParams } from './services/golfAPIService';
 
 export default function GolfBookingApp() {
   // State Management
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
   const [courses, setCourses] = useState<GolfCourse[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<GolfCourse | null>(null);
   const [teeTimes, setTeeTimes] = useState<TeeTime[]>([]);
@@ -100,28 +67,16 @@ export default function GolfBookingApp() {
     setError(null);
 
     try {
-      // Using GolfCourseAPI.com (FREE API)
-      // You'll need to sign up at https://golfcourseapi.com/ to get an API key
-      const response = await fetch(
-        `https://api.golfcourseapi.com/courses?lat=${userLocation.latitude}&lng=${userLocation.longitude}&radius=${searchRadius}`,
-        {
-          headers: {
-            // Replace with your actual API key from golfcourseapi.com
-            'Authorization': 'Bearer YOUR_API_KEY_HERE'
-          }
-        }
-      );
+      const results = await golfAPI.searchCourses({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        radius: searchRadius
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch courses');
-      }
-
-      const data = await response.json();
-      
       // Calculate distance for each course
-      const coursesWithDistance = data.courses.map((course: any) => ({
+      const coursesWithDistance = results.map((course) => ({
         ...course,
-        distance: calculateDistance(
+        distance: golfAPI.calculateDistance(
           userLocation.latitude,
           userLocation.longitude,
           course.latitude,
@@ -130,7 +85,7 @@ export default function GolfBookingApp() {
       }));
 
       // Sort by distance
-      coursesWithDistance.sort((a: GolfCourse, b: GolfCourse) => 
+      coursesWithDistance.sort((a, b) => 
         (a.distance || 0) - (b.distance || 0)
       );
 
@@ -138,26 +93,9 @@ export default function GolfBookingApp() {
       setLoading(false);
     } catch (err) {
       console.error('Error fetching courses:', err);
-      // Use mock data for demo purposes
+      // Use mock data for demo purposes if backend fails
       loadMockCourses();
     }
-  };
-
-  // Haversine formula to calculate distance between two GPS coordinates
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 3959; // Earth's radius in miles
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return parseFloat((R * c).toFixed(1));
-  };
-
-  const toRad = (value: number): number => {
-    return value * Math.PI / 180;
   };
 
   const loadMockCourses = () => {
@@ -177,7 +115,7 @@ export default function GolfBookingApp() {
         rating: 4.9,
         holes: 18,
         par: 72,
-        distance: userLocation ? calculateDistance(
+        distance: userLocation ? golfAPI.calculateDistance(
           userLocation.latitude,
           userLocation.longitude,
           36.5674,
@@ -198,57 +136,13 @@ export default function GolfBookingApp() {
         rating: 5.0,
         holes: 18,
         par: 72,
-        distance: userLocation ? calculateDistance(
+        distance: userLocation ? golfAPI.calculateDistance(
           userLocation.latitude,
           userLocation.longitude,
           33.5028,
           -82.0200
         ) : 0,
         photoUrl: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800'
-      },
-      {
-        id: '3',
-        name: 'TPC Sawgrass',
-        address: '110 Championship Way',
-        city: 'Ponte Vedra Beach',
-        state: 'FL',
-        zipCode: '32082',
-        latitude: 30.1977,
-        longitude: -81.3936,
-        phone: '(904) 273-3235',
-        website: 'tpc.com/sawgrass',
-        rating: 4.8,
-        holes: 18,
-        par: 72,
-        distance: userLocation ? calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          30.1977,
-          -81.3936
-        ) : 0,
-        photoUrl: 'https://images.unsplash.com/photo-1592919505780-303950717480?w=800'
-      },
-      {
-        id: '4',
-        name: 'Pinehurst No. 2',
-        address: '80 Carolina Vista Dr',
-        city: 'Pinehurst',
-        state: 'NC',
-        zipCode: '28374',
-        latitude: 35.1895,
-        longitude: -79.4698,
-        phone: '(855) 235-8507',
-        website: 'pinehurst.com',
-        rating: 4.7,
-        holes: 18,
-        par: 71,
-        distance: userLocation ? calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          35.1895,
-          -79.4698
-        ) : 0,
-        photoUrl: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800'
       }
     ];
 
@@ -258,57 +152,12 @@ export default function GolfBookingApp() {
 
   const loadTeeTimes = async (courseId: string) => {
     setLoading(true);
-    
-    // Mock tee times (in production, this would call GolfNow API)
-    const mockTeeTimes: TeeTime[] = [
-      {
-        id: '1',
-        courseId,
-        time: '7:00 AM',
-        date: selectedDate,
-        availableSlots: 4,
-        price: 89,
-        holes: 18
-      },
-      {
-        id: '2',
-        courseId,
-        time: '8:30 AM',
-        date: selectedDate,
-        availableSlots: 2,
-        price: 109,
-        holes: 18
-      },
-      {
-        id: '3',
-        courseId,
-        time: '10:00 AM',
-        date: selectedDate,
-        availableSlots: 4,
-        price: 129,
-        holes: 18
-      },
-      {
-        id: '4',
-        courseId,
-        time: '1:00 PM',
-        date: selectedDate,
-        availableSlots: 3,
-        price: 99,
-        holes: 18
-      },
-      {
-        id: '5',
-        courseId,
-        time: '3:30 PM',
-        date: selectedDate,
-        availableSlots: 4,
-        price: 79,
-        holes: 18
-      }
-    ];
-
-    setTeeTimes(mockTeeTimes.filter(t => t.price <= maxPrice));
+    try {
+      const times = await golfAPI.getTeeTimes(courseId, selectedDate);
+      setTeeTimes(times.filter(t => t.price <= maxPrice));
+    } catch (err) {
+      console.error('Error loading tee times:', err);
+    }
     setLoading(false);
   };
 

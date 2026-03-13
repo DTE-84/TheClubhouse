@@ -1,6 +1,6 @@
 /**
  * Golf API Service
- * Integrates with GolfCourseAPI.com (FREE) and GolfNow API (Paid)
+ * Points to the local DTE-Clubhouse Backend Proxy
  */
 
 interface GolfCourse {
@@ -40,69 +40,56 @@ interface SearchParams {
 }
 
 class GolfAPIService {
-  private golfCourseAPIKey: string;
-  private golfNowAPIKey: string;
-  private golfNowBaseURL: string;
+  private baseURL: string;
   
   constructor() {
-    this.golfCourseAPIKey = import.meta.env.VITE_GOLF_COURSE_API_KEY || '';
-    this.golfNowAPIKey = import.meta.env.VITE_GOLF_NOW_API_KEY || '';
-    this.golfNowBaseURL = import.meta.env.VITE_GOLF_NOW_BASE_URL || 'https://api.gnsvc.com/rest';
-    
-    console.log('⛳ GolfAPI System Initialized');
-    if (!this.golfCourseAPIKey) console.warn('⚠️ Missing VITE_GOLF_COURSE_API_KEY');
+    // In development, this points to our local express server
+    // In production, this would be your deployed API URL
+    this.baseURL = import.meta.env.VITE_API_URL || '/api';
+    console.log('⛳ GolfAPI Service Connected to Backend');
   }
 
   /**
-   * Search for golf courses using GolfCourseAPI.com
+   * Search for golf courses via our Local Proxy
    */
   async searchCourses(params: SearchParams): Promise<GolfCourse[]> {
     console.log(`📡 Uplink: Scanning radius ${params.radius}mi at [${params.latitude}, ${params.longitude}]`);
     
     try {
-      // Note: Some APIs require 'x-api-key' header instead of Bearer
       const response = await fetch(
-        `https://api.golfcourseapi.com/v1/courses?lat=${params.latitude}&lng=${params.longitude}&radius=${params.radius}`,
+        `${this.baseURL}/courses/search?lat=${params.latitude}&lng=${params.longitude}&radius=${params.radius}`,
         {
           method: 'GET',
           headers: {
-            'x-api-key': this.golfCourseAPIKey,
             'Accept': 'application/json'
           }
         }
       );
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        console.error('❌ API Error Response:', errorBody);
-        throw new Error(`GolfCourseAPI error: ${response.status} ${response.statusText}`);
+        throw new Error(`API error: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('✅ Data Received:', data);
       
-      // Handle various response structures (data.courses or data.data or data itself)
+      // The local proxy returns the normalized data
       const rawCourses = data.courses || data.data || (Array.isArray(data) ? data : []);
       
-      if (rawCourses.length === 0) {
-        console.warn('📭 No courses found in this sector. Check radius or coordinates.');
-      }
-
       return rawCourses.map((course: any) => ({
         id: course.id?.toString() || Math.random().toString(),
-        name: course.name || 'Unknown Championship Course',
-        address: course.address || course.street || '',
-        city: course.city || '',
-        state: course.state || course.region || '',
-        zipCode: course.zip || course.postal_code || '',
-        latitude: parseFloat(course.lat || course.latitude || params.latitude),
-        longitude: parseFloat(course.lng || course.longitude || params.longitude),
+        name: course.name || course.course_name || 'Unknown Championship Course',
+        address: course.address || course.location?.address || '',
+        city: course.city || course.location?.city || '',
+        state: course.state || course.location?.state || '',
+        zipCode: course.zipCode || course.location?.zip || '',
+        latitude: parseFloat(course.lat || course.latitude || course.location?.latitude || params.latitude),
+        longitude: parseFloat(course.lng || course.longitude || course.location?.longitude || params.longitude),
         phone: course.phone,
         website: course.website,
         rating: course.rating || 4.5,
         holes: course.holes || 18,
         par: course.par || 72,
-        photoUrl: course.photo_url || `https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&sig=${Math.random()}`
+        photoUrl: course.photoUrl || course.photo_url || `https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&sig=${Math.random()}`
       }));
     } catch (error) {
       console.error('❌ Search Failed:', error);
@@ -112,19 +99,13 @@ class GolfAPIService {
 
   async getTeeTimes(courseId: string, date: string): Promise<TeeTime[]> {
     console.log(`📡 Uplink: Fetching tee times for ${courseId} on ${date}`);
-    try {
-      // Mocking tee times if GolfNow API is not yet fully authorized
-      // This ensures the "Rich Old People" always see data even during uplink sync
-      return [
-        { id: `t1-${courseId}`, courseId, time: '7:30 AM', date, availableSlots: 4, price: 85, holes: 18 },
-        { id: `t2-${courseId}`, courseId, time: '8:45 AM', date, availableSlots: 2, price: 125, holes: 18 },
-        { id: `t3-${courseId}`, courseId, time: '10:15 AM', date, availableSlots: 4, price: 110, holes: 18 },
-        { id: `t4-${courseId}`, courseId, time: '1:30 PM', date, availableSlots: 1, price: 75, holes: 18 }
-      ];
-    } catch (error) {
-      console.error('Error fetching tee times:', error);
-      throw error;
-    }
+    // Mocking tee times for the bootcamp - in production, this would call GolfNow
+    return [
+      { id: `t1-${courseId}`, courseId, time: '7:30 AM', date, availableSlots: 4, price: 85, holes: 18 },
+      { id: `t2-${courseId}`, courseId, time: '8:45 AM', date, availableSlots: 2, price: 125, holes: 18 },
+      { id: `t3-${courseId}`, courseId, time: '10:15 AM', date, availableSlots: 4, price: 110, holes: 18 },
+      { id: `t4-${courseId}`, courseId, time: '1:30 PM', date, availableSlots: 1, price: 75, holes: 18 }
+    ];
   }
 
   calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
