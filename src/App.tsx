@@ -86,6 +86,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Before: fetch('/api/data')
+// After:
+const API_BASE = import.meta.env.VITE_API_URL;
+
+fetch(`${API_BASE}/api/data`)
+  .then(res => res.json())
+  .then(data => console.log(data));
+
   // Uplink Location & Search
   useEffect(() => {
     getUserLocation();
