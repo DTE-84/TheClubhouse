@@ -108,19 +108,19 @@ class GolfAPIService {
       const rawCourses = data.courses || data.data || (Array.isArray(data) ? data : []);
       
       return rawCourses.map((course: any) => ({
-        id: course.id?.toString() || Math.random().toString(),
-        name: course.course_name || course.club_name || course.name || 'Unknown Championship Course',
-        club_name: course.club_name,
-        course_name: course.course_name,
-        address: course.location?.address || course.address || '',
-        city: course.location?.city || course.city || '',
-        state: course.location?.state || course.state || '',
-        zipCode: course.location?.zipCode || course.zipCode || '',
-        latitude: parseFloat(course.location?.latitude || course.latitude || params.latitude || 0),
-        longitude: parseFloat(course.location?.longitude || course.longitude || params.longitude || 0),
+        id: (course._id || course.id)?.toString() || Math.random().toString(),
+        name: course.name || course.course_name || course.club_name || 'Unknown Championship Course',
+        club_name: course.club_name || course.name,
+        course_name: course.course_name || course.name,
+        address: course.address || course.location?.address || '',
+        city: course.city || course.location?.city || '',
+        state: course.state || course.location?.state || '',
+        zipCode: course.zip || course.zipCode || course.location?.zipCode || '',
+        latitude: parseFloat(course.lat || course.latitude || course.location?.latitude || params.latitude || 0),
+        longitude: parseFloat(course.lng || course.longitude || course.location?.longitude || params.longitude || 0),
         phone: course.phone,
         website: course.website,
-        rating: course.rating || 4.5,
+        rating: course.rating || course.courseRating || 4.5,
         photoUrl: course.photoUrl || course.photo_url || `https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&sig=${Math.random()}`,
         tees: course.tees
       }));
