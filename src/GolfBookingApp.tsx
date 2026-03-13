@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Calendar, DollarSign, Users, Navigation, Filter, Star, Clock, Phone, Globe, ChevronRight } from 'lucide-react';
 import { golfAPI, GolfCourse, TeeTime, SearchParams } from './services/golfAPIService';
+import fluffLogo from './assets/flufflogo.png';
 
 export default function GolfBookingApp() {
   // State Management
@@ -212,18 +213,16 @@ export default function GolfBookingApp() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0907] text-[#FCF6EB]">
+    <div className="min-h-screen bg-gradient-to-br from-[#0f1419] via-[#1a1f2e] to-[#0f1419] text-[#f5f5f0]" style={{ fontFamily: 'Mancho, Manrope, sans-serif' }}>
       {/* Header */}
-      <header className="bg-[#0D0E11] border-b border-white/5 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <header className="bg-gradient-to-r from-[#1a1f2e]/95 to-[#0f1419]/95 backdrop-blur-xl border-b border-amber-900/20 sticky top-0 z-50 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-fit">
-              <div className="w-10 h-10 bg-[#30C476] rounded-xl flex items-center justify-center">
-                <MapPin className="w-6 h-6 text-[#0A0907]" />
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-[#FCF6EB]">Fluff Booking</h1>
-                <p className="text-[10px] text-[#FCF6EB]/40 uppercase tracking-wider">GPS Course Finder</p>
+            <div className="flex items-center gap-4 min-w-fit">
+              <img src={fluffLogo} alt="Fluff Golf" className="h-12 w-auto" />
+              <div className="hidden sm:block border-l border-amber-700/30 pl-4">
+                <h1 className="text-2xl font-bold text-amber-50" style={{ fontFamily: 'Mancho, Manrope, sans-serif', letterSpacing: '0.02em' }}>The Clubhouse</h1>
+                <p className="text-[9px] text-amber-200/60 uppercase tracking-[0.2em] font-medium">Premier Course Finder</p>
               </div>
             </div>
 
@@ -231,28 +230,28 @@ export default function GolfBookingApp() {
             <div className="flex-1 max-w-md relative">
               <input
                 type="text"
-                placeholder="Search by course name or town..."
+                placeholder="Search premier courses..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-[#FCF6EB] placeholder:text-[#FCF6EB]/20 focus:outline-none focus:border-[#30C476]/50 transition-colors"
+                className="w-full bg-[#0f1419]/60 border border-amber-800/30 rounded-lg px-5 py-3 text-sm text-amber-50 placeholder:text-amber-200/30 focus:outline-none focus:border-amber-600/60 focus:ring-2 focus:ring-amber-600/20 transition-all backdrop-blur-sm"
               />
             </div>
             
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#30C476]/10 border border-[#30C476]/20 rounded-xl text-[#30C476] text-sm font-bold hover:bg-[#30C476]/20 transition-colors"
+              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-700/20 to-amber-900/20 border border-amber-700/40 rounded-lg text-amber-200 text-sm font-semibold hover:from-amber-700/30 hover:to-amber-900/30 hover:border-amber-600/60 transition-all shadow-lg hover:shadow-amber-900/20"
             >
               <Filter className="w-4 h-4" />
-              <span className="hidden sm:inline">Filters</span>
+              <span className="hidden sm:inline">Refine</span>
             </button>
           </div>
 
           {/* Filters Panel */}
           {showFilters && (
-            <div className="mt-4 p-4 bg-black/40 rounded-xl border border-white/5 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="mt-4 p-6 bg-gradient-to-br from-[#1a1f2e]/80 to-[#0f1419]/80 backdrop-blur-xl rounded-xl border border-amber-800/30 space-y-4 shadow-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div>
-                  <label className="block text-[9px] uppercase tracking-wider text-[#FCF6EB]/40 mb-2">
+                  <label className="block text-[10px] uppercase tracking-[0.15em] text-amber-200/70 mb-3 font-semibold">
                     Search Radius: {searchRadius} mi
                   </label>
                   <input
@@ -261,12 +260,12 @@ export default function GolfBookingApp() {
                     max="250"
                     value={searchRadius}
                     onChange={(e) => setSearchRadius(Number(e.target.value))}
-                    className="w-full accent-[#30C476]"
+                    className="w-full accent-amber-600 h-2 bg-amber-900/20 rounded-lg appearance-none cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[9px] uppercase tracking-wider text-[#FCF6EB]/40 mb-2">
+                  <label className="block text-[10px] uppercase tracking-[0.15em] text-amber-200/70 mb-3 font-semibold">
                     Max Price: ${maxPrice}
                   </label>
                   <input
@@ -276,30 +275,30 @@ export default function GolfBookingApp() {
                     step="10"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(Number(e.target.value))}
-                    className="w-full accent-[#30C476]"
+                    className="w-full accent-amber-600 h-2 bg-amber-900/20 rounded-lg appearance-none cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[9px] uppercase tracking-wider text-[#FCF6EB]/40 mb-2">
+                  <label className="block text-[10px] uppercase tracking-[0.15em] text-amber-200/70 mb-3 font-semibold">
                     Date
                   </label>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#FCF6EB]"
+                    className="w-full bg-[#0f1419]/60 border border-amber-800/30 rounded-lg px-4 py-2.5 text-sm text-amber-50 focus:outline-none focus:border-amber-600/60 focus:ring-2 focus:ring-amber-600/20 transition-all"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[9px] uppercase tracking-wider text-[#FCF6EB]/40 mb-2">
+                  <label className="block text-[10px] uppercase tracking-[0.15em] text-amber-200/70 mb-3 font-semibold">
                     Players
                   </label>
                   <select
                     value={playerCount}
                     onChange={(e) => setPlayerCount(Number(e.target.value))}
-                    className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-[#FCF6EB]"
+                    className="w-full bg-[#0f1419]/60 border border-amber-800/30 rounded-lg px-4 py-2.5 text-sm text-amber-50 focus:outline-none focus:border-amber-600/60 focus:ring-2 focus:ring-amber-600/20 transition-all"
                   >
                     <option value={1}>1 Player</option>
                     <option value={2}>2 Players</option>
@@ -310,7 +309,7 @@ export default function GolfBookingApp() {
               </div>
 
               {userLocation && (
-                <div className="flex items-center gap-2 text-xs text-[#30C476]">
+                <div className="flex items-center gap-2 text-xs text-amber-300/80 pt-2">
                   <Navigation className="w-4 h-4" />
                   <span>
                     Your Location: {userLocation.latitude.toFixed(4)}, {userLocation.longitude.toFixed(4)}
@@ -468,69 +467,70 @@ export default function GolfBookingApp() {
         ) : (
           // Courses List View
           <div>
-            <h2 className="text-2xl font-bold mb-6">
-              Courses Near You ({courses.length} found)
+            <h2 className="text-3xl font-bold mb-8 text-amber-50" style={{ fontFamily: 'Mancho, Manrope, sans-serif' }}>
+              Premier Courses ({courses.length} available)
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {courses.map((course) => (
                 <div
                   key={course.id}
                   onClick={() => handleCourseSelect(course)}
-                  className="bg-[#0D0E11] rounded-2xl border border-white/5 overflow-hidden hover:border-[#30C476]/30 transition-all cursor-pointer group"
+                  className="bg-gradient-to-br from-[#1a1f2e]/60 to-[#0f1419]/60 backdrop-blur-sm rounded-2xl border border-amber-800/20 overflow-hidden hover:border-amber-600/50 hover:shadow-2xl hover:shadow-amber-900/20 transition-all duration-300 cursor-pointer group"
                 >
                   {course.photoUrl && (
-                    <div className="aspect-video overflow-hidden">
+                    <div className="aspect-video overflow-hidden relative">
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0f1419] via-transparent to-transparent z-10" />
                       <img
                         src={course.photoUrl}
                         alt={course.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                       />
                     </div>
                   )}
 
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-lg font-bold group-hover:text-[#30C476] transition-colors">
+                      <h3 className="text-xl font-bold group-hover:text-amber-400 transition-colors" style={{ fontFamily: 'Mancho, Manrope, sans-serif' }}>
                         {course.name}
                       </h3>
                       {course.rating && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span>{course.rating}</span>
+                        <div className="flex items-center gap-1.5 text-sm bg-amber-900/30 px-2.5 py-1 rounded-full border border-amber-700/30">
+                          <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                          <span className="text-amber-200 font-semibold">{course.rating}</span>
                         </div>
                       )}
                     </div>
 
-                    <p className="text-sm text-[#FCF6EB]/60 mb-4">
+                    <p className="text-sm text-amber-100/60 mb-5 font-light">
                       {course.city}, {course.state}
                     </p>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 text-[#30C476]">
+                    <div className="flex items-center justify-between text-sm mb-5">
+                      <div className="flex items-center gap-2 text-amber-400">
                         <MapPin className="w-4 h-4" />
-                        <span className="font-bold">{course.distance} mi</span>
+                        <span className="font-semibold">{course.distance} mi</span>
                       </div>
 
                       {course.holes && (
-                        <div className="text-[#FCF6EB]/40">
+                        <div className="text-amber-100/50 text-xs">
                           {course.holes} holes • Par {course.par}
                         </div>
                       )}
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-white/5">
-                      <div className="flex items-center justify-between text-xs text-[#FCF6EB]/40">
+                    <div className="pt-5 border-t border-amber-800/20">
+                      <div className="flex items-center justify-between text-xs text-amber-100/40">
                         {course.phone && (
-                          <div className="flex items-center gap-1">
-                            <Phone className="w-3 h-3" />
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5" />
                             <span>{course.phone}</span>
                           </div>
                         )}
                         {course.website && (
-                          <div className="flex items-center gap-1">
-                            <Globe className="w-3 h-3" />
-                            <span>Website</span>
+                          <div className="flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5" />
+                            <span className="uppercase tracking-wider text-[10px]">Website</span>
                           </div>
                         )}
                       </div>

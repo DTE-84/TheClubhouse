@@ -1,8 +1,8 @@
 import { RequestHandler } from "express";
 import axios from "axios";
 
-const GOLF_COURSE_API_KEY = process.env.GOLF_COURSE_API_KEY || process.env.VITE_GOLF_COURSE_API_KEY;
-const BASE_URL = "https://api.golfcourseapi.com/v1";
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || process.env.GOLF_COURSE_API_KEY;
+const BASE_URL = "https://golf-course-api.p.rapidapi.com";
 
 export const handleSearch: RequestHandler = async (req, res) => {
   const { lat, lng, radius, q } = req.query;
@@ -13,19 +13,21 @@ export const handleSearch: RequestHandler = async (req, res) => {
     if (q) {
       console.log(`⛳ API: Searching courses for query: "${q}"`);
       response = await axios.get(`${BASE_URL}/search`, {
-        params: { search_query: q },
+        params: { name: q },
         headers: {
-          'Authorization': GOLF_COURSE_API_KEY,
-          'Accept': 'application/json'
+          'x-rapidapi-key': RAPIDAPI_KEY,
+          'x-rapidapi-host': 'golf-course-api.p.rapidapi.com',
+          'Content-Type': 'application/json'
         }
       });
     } else if (lat && lng) {
       console.log(`⛳ API: Searching courses near ${lat}, ${lng} within ${radius}mi`);
-      response = await axios.get(`${BASE_URL}/courses`, {
+      response = await axios.get(`${BASE_URL}/search`, {
         params: { lat, lng, radius },
         headers: {
-          'Authorization': GOLF_COURSE_API_KEY,
-          'Accept': 'application/json'
+          'x-rapidapi-key': RAPIDAPI_KEY,
+          'x-rapidapi-host': 'golf-course-api.p.rapidapi.com',
+          'Content-Type': 'application/json'
         }
       });
     } else {
@@ -46,10 +48,11 @@ export const handleGetCourse: RequestHandler = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const response = await axios.get(`${BASE_URL}/courses/${id}`, {
+    const response = await axios.get(`${BASE_URL}/course/${id}`, {
       headers: {
-        'Authorization': GOLF_COURSE_API_KEY,
-        'Accept': 'application/json'
+        'x-rapidapi-key': RAPIDAPI_KEY,
+        'x-rapidapi-host': 'golf-course-api.p.rapidapi.com',
+        'Content-Type': 'application/json'
       }
     });
 
