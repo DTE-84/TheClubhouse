@@ -65,7 +65,6 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   
   // ── DATA STATE ──
   const [courses, setCourses] = useState<GolfCourse[]>([]);
@@ -74,6 +73,7 @@ export default function App() {
   
   // ── FILTER STATE (OUTLIER MANAGEMENT) ──
   const [searchRadius, setSearchRadius] = useState(25);
+  const [searchQuery, setSearchQuery] = useState('');
   const [maxPrice, setMaxPrice] = useState(150);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [playerCount, setPlayerCount] = useState(4);
@@ -86,24 +86,16 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Before: fetch('/api/data')
-// After:
-const API_BASE = import.meta.env.VITE_API_URL;
-
-fetch(`${API_BASE}/api/data`)
-  .then(res => res.json())
-  .then(data => console.log(data));
-
   // Uplink Location & Search
   useEffect(() => {
     getUserLocation();
   }, []);
 
   useEffect(() => {
-    if (userLocation) {
+    if (userLocation || searchQuery) {
       performLiveSearch();
     }
-  }, [userLocation, searchRadius]);
+  }, [userLocation, searchRadius, searchQuery]);
 
   const getUserLocation = () => {
     setLoading(true);
@@ -125,17 +117,18 @@ fetch(`${API_BASE}/api/data`)
   };
 
   const performLiveSearch = async () => {
-    if (!userLocation) return;
+    if (!userLocation && !searchQuery) return;
     setLoading(true);
     try {
       const results = await golfAPI.searchCourses({
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-        radius: searchRadius
+        latitude: userLocation?.latitude,
+        longitude: userLocation?.longitude,
+        radius: searchRadius,
+        query: searchQuery
       });
       const coursesWithDistance = results.map(course => ({
         ...course,
-        distance: golfAPI.calculateDistance(userLocation.latitude, userLocation.longitude, course.latitude, course.longitude)
+        distance: userLocation ? golfAPI.calculateDistance(userLocation.latitude, userLocation.longitude, course.latitude, course.longitude) : 0
       }));
       setCourses(coursesWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0)));
     } catch (err: any) {
@@ -158,10 +151,40 @@ fetch(`${API_BASE}/api/data`)
         latitude: 36.5674,
         longitude: -121.9500,
         rating: 4.9,
-        holes: 18,
-        par: 72,
         distance: 12.4,
-        photoUrl: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800'
+        photoUrl: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
+        tees: {
+          female: [],
+          male: [
+            {
+              tee_name: "Blue",
+              course_rating: 75.5,
+              slope_rating: 145,
+              total_yards: 6828,
+              par_total: 72,
+              holes: [
+                { par: 4, yardage: 377, handicap: 8 },
+                { par: 5, yardage: 511, handicap: 10 },
+                { par: 4, yardage: 390, handicap: 12 },
+                { par: 4, yardage: 326, handicap: 16 },
+                { par: 3, yardage: 192, handicap: 14 },
+                { par: 5, yardage: 506, handicap: 2 },
+                { par: 3, yardage: 106, handicap: 18 },
+                { par: 4, yardage: 427, handicap: 6 },
+                { par: 4, yardage: 481, handicap: 4 },
+                { par: 4, yardage: 446, handicap: 5 },
+                { par: 4, yardage: 373, handicap: 13 },
+                { par: 3, yardage: 201, handicap: 15 },
+                { par: 4, yardage: 403, handicap: 9 },
+                { par: 5, yardage: 572, handicap: 1 },
+                { par: 4, yardage: 396, handicap: 11 },
+                { par: 4, yardage: 401, handicap: 7 },
+                { par: 3, yardage: 178, handicap: 17 },
+                { par: 5, yardage: 543, handicap: 3 }
+              ]
+            }
+          ]
+        }
       },
       {
         id: '2',
@@ -316,6 +339,19 @@ fetch(`${API_BASE}/api/data`)
             </div>
           </div>
 
+          <div className="flex-1 max-w-xl mx-12 hidden lg:flex relative group">
+            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none text-white/20 group-focus-within:text-[#30C476] transition-colors">
+              <Search size={20} />
+            </div>
+            <input 
+              type="text" 
+              placeholder="Search Championship Links..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/[0.03] border border-white/5 rounded-[22px] py-5 pl-16 pr-8 text-sm focus:outline-none focus:border-[#30C476]/30 focus:bg-white/[0.05] transition-all font-tech tracking-widest placeholder:text-white/10"
+            />
+          </div>
+
           <div className="flex items-center gap-6 md:gap-12 group cursor-pointer">
             <div className="text-right hidden sm:block">
               <p className="text-[11px] font-tech text-[#4A4A5A] uppercase tracking-[0.6em] mb-2 leading-none font-bold">Elite Patron</p>
@@ -368,7 +404,7 @@ fetch(`${API_BASE}/api/data`)
                 <h2 className="font-display text-8xl md:text-[18rem] mb-8 md:mb-12 leading-[0.7] md:leading-[0.6] tracking-tighter opacity-95 uppercase text-glow">PEBBLE BEACH</h2>
                 <p className="text-[#4A4A5A] mb-12 md:mb-20 font-medium text-xl md:text-4xl leading-snug md:leading-tight max-w-3xl border-l-2 border-[#30C476]/20 pl-8 md:pl-16 italic">"The ultimate meeting of land and sea."</p>
                 <div className="flex flex-col sm:flex-row gap-6 md:gap-12">
-                  <button className="bg-white text-black px-12 md:px-24 py-6 md:py-10 rounded-[35px] md:rounded-[50px] font-black uppercase text-sm md:text-lg hover:bg-[#30C476] transition-all hover:scale-105 active:scale-95 shadow-[0_50px_100px_rgba(0,0,0,0.7)] flex items-center justify-center gap-6 md:gap-8 group/btn">
+                  <button onClick={() => setActiveTab('search')} className="bg-white text-black px-12 md:px-24 py-6 md:py-10 rounded-[35px] md:rounded-[50px] font-black uppercase text-sm md:text-lg hover:bg-[#30C476] transition-all hover:scale-105 active:scale-95 shadow-[0_50px_100px_rgba(0,0,0,0.7)] flex items-center justify-center gap-6 md:gap-8 group/btn">
                     Secure Tee Time <ChevronRight size={28} className="group-hover/btn:translate-x-4 transition-transform duration-700" />
                   </button>
                 </div>
@@ -382,9 +418,9 @@ fetch(`${API_BASE}/api/data`)
               <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-20 border-b border-white/5 pb-16 md:pb-20">
                 <h3 className="font-display text-8xl md:text-9xl tracking-tighter mb-6 uppercase leading-none">The Links</h3>
                 <div className="flex gap-6 items-center">
-                  <div className="bg-white/[0.01] border border-white/5 p-5 md:p-6 rounded-[40px] shadow-4xl ring-1 ring-white/5">
+                  <div className="bg-white/[0.01] border border-white/5 p-5 md:p-6 rounded-[40px] shadow-4xl ring-1 ring-white/5 flex items-center gap-6">
                     <input type="range" min="5" max="100" value={searchRadius} onChange={(e) => setSearchRadius(Number(e.target.value))} className="accent-[#30C476] w-48 md:w-80 h-2 bg-white/10 rounded-full appearance-none cursor-pointer" />
-                    <span className="text-[14px] md:text-[16px] font-mono text-[#30C476] ml-6 font-black">{searchRadius}MI</span>
+                    <span className="text-[14px] md:text-[16px] font-mono text-[#30C476] font-black">{searchRadius}MI</span>
                   </div>
                 </div>
               </div>
@@ -406,7 +442,6 @@ const CourseCard = ({ course, onClick }: any) => (
     onClick={onClick}
     className="group cursor-pointer glass-surface rounded-[40px] md:rounded-[60px] overflow-hidden transition-all duration-1000 hover:border-[#30C476]/50 hover:shadow-[0_100px_200px_rgba(0,0,0,1)] hover:translate-y-[-24px] kinetic-border"
   >
-    {/* Image Container (Premier Layout) */}
     <div className="relative h-64 md:h-80 bg-gradient-to-br from-slate-200 to-slate-300 overflow-hidden">
       <img
         src={course.photoUrl || 'https://images.unsplash.com/photo-1592919505780-303950717480?w=800'}
@@ -414,20 +449,15 @@ const CourseCard = ({ course, onClick }: any) => (
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[5s] opacity-40 group-hover:opacity-100 grayscale group-hover:grayscale-0"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-      {/* Price Badge */}
       <div className="absolute top-6 right-6 bg-white/95 backdrop-blur-md text-black px-5 py-2.5 rounded-full text-sm font-black tracking-tight shadow-2xl">
         $125+
       </div>
-
-      {/* Rating Badge */}
       <div className="absolute top-6 left-6 bg-[#30C476] backdrop-blur-md text-black px-4 py-2 rounded-full text-xs font-black tracking-wide flex items-center gap-2 shadow-2xl">
         <Star size={12} className="fill-black" />
         {course.rating || '4.5'}
       </div>
     </div>
 
-    {/* Content (Premier Design) */}
     <div className="p-10 md:p-12">
       <h3 className="text-4xl md:text-5xl font-display font-bold text-white mb-3 tracking-tight group-hover:text-[#30C476] transition-colors">{course.name}</h3>
       <div className="flex items-center gap-2 text-[#4A4A5A] mb-8">
@@ -436,7 +466,6 @@ const CourseCard = ({ course, onClick }: any) => (
         <span className="text-xs font-mono text-[#30C476]">• {course.distance} mi</span>
       </div>
 
-      {/* Stats Grid (The Gift Layout) */}
       <div className="grid grid-cols-3 gap-4 mb-8 pb-8 border-b border-white/5">
         <div className="text-center px-2 py-1">
           <div className="text-3xl font-display font-bold text-[#30C476] leading-none">18</div>
@@ -452,21 +481,7 @@ const CourseCard = ({ course, onClick }: any) => (
         </div>
       </div>
 
-      {/* Availability */}
-      <div className="flex items-center gap-4 mb-8 p-5 bg-white/[0.02] rounded-2xl border border-white/5 group-hover:border-[#30C476]/20 transition-colors">
-        <Zap size={20} className="text-[#30C476] flex-shrink-0 animate-pulse" />
-        <div>
-          <span className="text-sm font-black text-white uppercase tracking-tighter">
-            4 Deployment Slots
-          </span>
-          <div className="text-[10px] text-[#4A4A5A] font-bold uppercase tracking-widest">Available today</div>
-        </div>
-      </div>
-
-      {/* Book Button */}
-      <button
-        className="w-full bg-[#30C476] hover:bg-white text-black font-black py-5 px-6 rounded-2xl transition-all duration-500 flex items-center justify-center gap-3 group/btn uppercase text-xs tracking-widest shadow-xl hover:shadow-[#30C476]/20 hover:scale-[1.02] active:scale-95"
-      >
+      <button className="w-full bg-[#30C476] hover:bg-white text-black font-black py-5 px-6 rounded-2xl transition-all duration-500 flex items-center justify-center gap-3 group/btn uppercase text-xs tracking-widest shadow-xl hover:shadow-[#30C476]/20 hover:scale-[1.02] active:scale-95">
         <Trophy size={18} />
         Secure Round
         <ArrowUpRight size={16} className="opacity-0 group-hover/btn:opacity-100 transition-all duration-500 translate-y-1 group-hover/btn:translate-y-0" />
@@ -475,7 +490,102 @@ const CourseCard = ({ course, onClick }: any) => (
   </div>
 );
 
-const GPSReconView = ({ location, courses }: any) => (
+const TeeTimeView = ({ course, teeTimes, onBack, onBook, loading }: any) => (
+  <div className="animate-in fade-in duration-1000 slide-in-from-right-20">
+    <button onClick={onBack} className="mb-24 text-[16px] font-tech text-[#30C476] uppercase tracking-[1em] flex items-center gap-10 hover:translate-x-[-20px] transition-all group">
+      <div className="bg-[#30C476]/10 p-6 rounded-[40px] group-hover:bg-[#30C476]/20 transition-colors border border-[#30C476]/20 shadow-4xl"><ChevronRight size={40} className="rotate-180" /></div>Return to Global Network
+    </button>
+    
+    <div className="glass-surface rounded-[120px] p-40 mb-16 relative overflow-hidden ring-1 ring-white/10 shadow-[0_120px_240px_rgba(0,0,0,1)]">
+      <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-[#30C476]/[0.05] blur-[300px] rounded-full translate-x-1/2 -translate-y-1/2" />
+      <div className="relative z-10">
+        <h2 className="font-display text-[12rem] md:text-[15rem] mb-8 tracking-tighter leading-[0.65] uppercase text-[#30C476] text-glow line-clamp-2">
+          {course.name}
+        </h2>
+        <div className="flex items-center gap-6 mt-12">
+          <div className="flex items-center gap-3 bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
+            <MapPin size={20} className="text-[#30C476]" />
+            <span className="font-tech text-sm uppercase tracking-widest">{course.city}, {course.state}</span>
+          </div>
+          <div className="flex items-center gap-3 bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
+            <Star size={20} className="text-yellow-500 fill-yellow-500" />
+            <span className="font-tech text-sm uppercase tracking-widest">{course.rating || '4.5'} / 5.0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Course Scorecard Integration */}
+    {course.tees && (course.tees.male.length > 0 || course.tees.female.length > 0) && (
+      <div className="mb-24 animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
+        <Scorecard courseData={course} />
+      </div>
+    )}
+
+    <div className="space-y-16 max-w-[1600px] pb-80">
+      {teeTimes.map((t: any) => (
+        <div key={t.id} className="group bg-white/[0.01] backdrop-blur-[200px] border border-white/5 p-20 rounded-[100px] flex flex-col lg:flex-row items-center justify-between hover:border-[#30C476]/50 transition-all duration-1000 shadow-2xl relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-center gap-40 relative z-10">
+            <div className="text-center"><div className="font-display text-[14rem] tracking-tighter text-[#30C476] group-hover:text-white transition-colors leading-none">{t.time}</div></div>
+            <div className="grid grid-cols-2 gap-x-32 gap-y-12">
+              <div className="space-y-6"><div className="flex items-center gap-8 text-4xl font-mono text-white/60 font-black"><Users size={40} className="text-[#30C476]" /><span>{t.availableSlots} Players</span></div></div>
+              <div className="space-y-6"><div className="flex items-center gap-8 text-4xl font-mono text-[#30C476] font-black"><DollarSign size={40} /><span>${t.price}</span></div></div>
+            </div>
+          </div>
+          <button onClick={() => onBook(t)} className="bg-[#30C476] text-black px-32 py-12 rounded-[60px] font-black uppercase text-xl hover:bg-white hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-10 group/btn relative z-10">Confirm Round <ChevronRight size={40} className="group-hover/btn:translate-x-6 transition-transform duration-1000" /></button>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const Scorecard = ({ courseData, courseName }: any) => {
+  const teeBox = courseData?.tees?.male[0] || null;
+  const holes = teeBox?.holes || Array.from({ length: 18 }).map(() => ({ par: 4, yardage: '---', handicap: '-' }));
+  const name = courseData?.name || courseName;
+
+  return (
+    <div className="glass-surface rounded-[80px] p-20 border border-white/10 relative overflow-hidden shadow-[0_80px_160px_rgba(0,0,0,0.9)] ring-1 ring-white/5">
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-12 mb-16 px-4 md:px-0">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-tech text-[#30C476] uppercase tracking-[0.8em] mb-4">Tactical Course Layout</span>
+          <h4 className="text-6xl font-display uppercase tracking-tight text-white leading-none text-glow">{name}</h4>
+        </div>
+        <div className="flex gap-12 bg-white/[0.02] p-8 rounded-[40px] border border-white/5 w-full sm:w-auto">
+          <div className="text-center flex-1 px-8">
+            <p className="text-[9px] font-tech text-[#4A4A5A] uppercase tracking-widest mb-2">Total Par</p>
+            <p className="text-7xl font-display text-[#30C476] font-black tracking-tighter">{teeBox?.par_total || 72}</p>
+          </div>
+          <div className="text-center border-l border-white/10 flex-1 px-8">
+            <p className="text-[9px] font-tech text-[#4A4A5A] uppercase tracking-widest mb-2">Total Yards</p>
+            <p className="text-7xl font-display text-white font-black tracking-tighter">{teeBox?.total_yards || '---'}</p>
+          </div>
+        </div>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar pb-12">
+        <div className="inline-flex gap-6 min-w-full">
+          {holes.map((hole: any, i: number) => (
+            <div key={i} className="w-40 shrink-0 bg-white/[0.01] border border-white/5 rounded-[40px] p-10 text-center hover:bg-[#30C476]/[0.03] transition-all duration-700 group cursor-pointer hover:shadow-2xl">
+              <p className="text-[11px] font-tech text-[#4A4A5A] uppercase tracking-widest mb-6 font-bold">Hole {i + 1}</p>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-mono text-white/20 uppercase tracking-tighter">Par</p>
+                  <p className="text-5xl font-display text-white font-black group-hover:text-[#30C476] transition-colors leading-none">{hole.par}</p>
+                </div>
+                <div className="pt-4 border-t border-white/5">
+                  <p className="text-[10px] font-mono text-[#30C476] font-bold">{hole.yardage} YDS</p>
+                  <p className="text-[9px] font-mono text-[#4A4A5A] mt-1">HCP {hole.handicap}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const GPSReconView = ({ location }: any) => (
   <div className="animate-in fade-in slide-in-from-bottom-12 duration-1000 h-full flex flex-col">
     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-16 border-b border-white/5 pb-12">
       <div>
@@ -547,45 +657,6 @@ const NavItem = ({ icon, label, active, expanded, onClick }: any) => (
     <div className={cn("shrink-0 transition-all duration-700", active ? "text-[#30C476] scale-125 rotate-6" : "group-hover:text-white group-hover:translate-x-3")}>{icon}</div>
     {expanded && <span className="text-[17px] font-black uppercase tracking-[0.4em] overflow-hidden whitespace-nowrap">{label}</span>}
   </button>
-);
-
-const TeeTimeView = ({ course, teeTimes, onBack, onBook, loading }: any) => (
-  <div className="animate-in fade-in duration-1000 slide-in-from-right-20">
-    <button onClick={onBack} className="mb-24 text-[16px] font-tech text-[#30C476] uppercase tracking-[1em] flex items-center gap-10 hover:translate-x-[-20px] transition-all group">
-      <div className="bg-[#30C476]/10 p-6 rounded-[40px] group-hover:bg-[#30C476]/20 transition-colors border border-[#30C476]/20 shadow-4xl"><ChevronRight size={40} className="rotate-180" /></div>Return to Global Network
-    </button>
-    <div className="glass-surface rounded-[120px] p-40 mb-32 relative overflow-hidden ring-1 ring-white/10 shadow-[0_120px_240px_rgba(0,0,0,1)]">
-      <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-[#30C476]/[0.05] blur-[300px] rounded-full translate-x-1/2 -translate-y-1/2" />
-      <div className="relative z-10"><h2 className="font-display text-[15rem] md:text-[20rem] mb-16 tracking-tighter leading-[0.65] uppercase text-[#30C476] text-glow">{course.name}</h2></div>
-    </div>
-    <div className="space-y-16 max-w-[1600px] pb-80">
-      {teeTimes.map((t: any) => (
-        <div key={t.id} className="group bg-white/[0.01] backdrop-blur-[200px] border border-white/5 p-20 rounded-[100px] flex flex-col lg:flex-row items-center justify-between hover:border-[#30C476]/50 transition-all duration-1000 shadow-2xl relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row items-center gap-40 relative z-10">
-            <div className="text-center"><div className="font-display text-[14rem] tracking-tighter text-[#30C476] group-hover:text-white transition-colors leading-none">{t.time}</div></div>
-            <div className="grid grid-cols-2 gap-x-32 gap-y-12">
-              <div className="space-y-6"><div className="flex items-center gap-8 text-4xl font-mono text-white/60 font-black"><Users size={40} className="text-[#30C476]" /><span>{t.availableSlots} Players</span></div></div>
-              <div className="space-y-6"><div className="flex items-center gap-8 text-4xl font-mono text-[#30C476] font-black"><DollarSign size={40} /><span>${t.price}</span></div></div>
-            </div>
-          </div>
-          <button onClick={() => onBook(t)} className="bg-[#30C476] text-black px-32 py-12 rounded-[60px] font-black uppercase text-xl hover:bg-white hover:scale-105 active:scale-95 transition-all shadow-2xl flex items-center gap-10 group/btn relative z-10">Confirm Round <ChevronRight size={40} className="group-hover/btn:translate-x-6 transition-transform duration-1000" /></button>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const Scorecard = ({ courseName, date }: any) => (
-  <div className="glass-surface rounded-[80px] p-20 border border-white/10 relative overflow-hidden shadow-[0_80px_160px_rgba(0,0,0,0.9)] ring-1 ring-white/5">
-    <div className="flex flex-col lg:flex-row items-center justify-between gap-12 mb-16 px-4 md:px-0">
-      <h4 className="text-6xl font-display uppercase tracking-tight text-white mb-4 leading-none text-glow">{courseName}</h4>
-      <div className="flex gap-12 bg-white/[0.02] p-8 rounded-[40px] border border-white/5 w-full sm:w-auto">
-        <div className="text-center flex-1 px-8"><p className="text-7xl font-display text-[#30C476] font-black tracking-tighter">-2</p></div>
-        <div className="text-center border-l border-white/10 flex-1 px-8"><p className="text-7xl font-display text-white font-black tracking-tighter">18</p></div>
-      </div>
-    </div>
-    <div className="overflow-x-auto custom-scrollbar pb-12"><div className="inline-flex gap-6 min-w-full">{Array.from({ length: 18 }).map((_, i) => (<div key={i} className="w-32 shrink-0 bg-white/[0.01] border border-white/5 rounded-[40px] p-10 text-center hover:bg-[#30C476]/[0.03] transition-all duration-700 group cursor-pointer hover:shadow-2xl"><p className="text-[11px] font-tech text-[#4A4A5A] uppercase tracking-widest mb-6 font-bold">Hole {i + 1}</p><p className="text-5xl font-display text-white font-black group-hover:scale-125 transition-transform leading-none mb-6">4</p></div>))}</div></div>
-  </div>
 );
 
 const CaddieIntelView = ({ location }: any) => (

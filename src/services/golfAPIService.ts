@@ -32,6 +32,8 @@ interface GolfCourse {
   phone?: string;
   website?: string;
   rating?: number;
+  holes?: number;
+  par?: number;
   distance?: number;
   photoUrl?: string;
   tees?: {

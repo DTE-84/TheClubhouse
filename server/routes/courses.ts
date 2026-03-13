@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import axios from "axios";
 
-const GOLF_COURSE_API_KEY = process.env.VITE_GOLF_COURSE_API_KEY;
+const GOLF_COURSE_API_KEY = process.env.GOLF_COURSE_API_KEY || process.env.VITE_GOLF_COURSE_API_KEY;
 const BASE_URL = "https://api.golfcourseapi.com/v1";
 
 export const handleSearch: RequestHandler = async (req, res) => {
@@ -15,7 +15,7 @@ export const handleSearch: RequestHandler = async (req, res) => {
       response = await axios.get(`${BASE_URL}/search`, {
         params: { search_query: q },
         headers: {
-          'x-api-key': GOLF_COURSE_API_KEY,
+          'Authorization': GOLF_COURSE_API_KEY,
           'Accept': 'application/json'
         }
       });
@@ -24,7 +24,7 @@ export const handleSearch: RequestHandler = async (req, res) => {
       response = await axios.get(`${BASE_URL}/courses`, {
         params: { lat, lng, radius },
         headers: {
-          'x-api-key': GOLF_COURSE_API_KEY,
+          'Authorization': GOLF_COURSE_API_KEY,
           'Accept': 'application/json'
         }
       });
@@ -48,7 +48,7 @@ export const handleGetCourse: RequestHandler = async (req, res) => {
   try {
     const response = await axios.get(`${BASE_URL}/courses/${id}`, {
       headers: {
-        'x-api-key': GOLF_COURSE_API_KEY,
+        'Authorization': GOLF_COURSE_API_KEY,
         'Accept': 'application/json'
       }
     });

@@ -258,7 +258,7 @@ export default function GolfBookingApp() {
                   <input
                     type="range"
                     min="5"
-                    max="100"
+                    max="250"
                     value={searchRadius}
                     onChange={(e) => setSearchRadius(Number(e.target.value))}
                     className="w-full accent-[#30C476]"
