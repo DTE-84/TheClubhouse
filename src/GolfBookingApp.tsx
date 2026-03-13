@@ -117,15 +117,45 @@ export default function GolfBookingApp() {
         phone: '(831) 622-8723',
         website: 'pebblebeach.com',
         rating: 4.9,
-        holes: 18,
-        par: 72,
         distance: userLocation ? golfAPI.calculateDistance(
           userLocation.latitude,
           userLocation.longitude,
           36.5674,
           -121.9500
         ) : 0,
-        photoUrl: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800'
+        photoUrl: 'https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800',
+        tees: {
+          female: [],
+          male: [
+            {
+              tee_name: "Blue",
+              course_rating: 75.5,
+              slope_rating: 145,
+              total_yards: 6828,
+              par_total: 72,
+              holes: [
+                { par: 4, yardage: 377, handicap: 8 },
+                { par: 5, yardage: 511, handicap: 10 },
+                { par: 4, yardage: 390, handicap: 12 },
+                { par: 4, yardage: 326, handicap: 16 },
+                { par: 3, yardage: 192, handicap: 14 },
+                { par: 5, yardage: 506, handicap: 2 },
+                { par: 3, yardage: 106, handicap: 18 },
+                { par: 4, yardage: 427, handicap: 6 },
+                { par: 4, yardage: 481, handicap: 4 },
+                { par: 4, yardage: 446, handicap: 5 },
+                { par: 4, yardage: 373, handicap: 13 },
+                { par: 3, yardage: 201, handicap: 15 },
+                { par: 4, yardage: 403, handicap: 9 },
+                { par: 5, yardage: 572, handicap: 1 },
+                { par: 4, yardage: 396, handicap: 11 },
+                { par: 4, yardage: 401, handicap: 7 },
+                { par: 3, yardage: 178, handicap: 17 },
+                { par: 5, yardage: 543, handicap: 3 }
+              ]
+            }
+          ]
+        }
       },
       {
         id: '2',
