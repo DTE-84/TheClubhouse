@@ -3,9 +3,26 @@
  * Points to the local DTE-Clubhouse Backend Proxy
  */
 
+interface Hole {
+  par: number;
+  yardage: number;
+  handicap: number;
+}
+
+interface TeeBox {
+  tee_name: string;
+  course_rating: number;
+  slope_rating: number;
+  total_yards: number;
+  par_total: number;
+  holes: Hole[];
+}
+
 interface GolfCourse {
   id: string;
   name: string;
+  club_name?: string;
+  course_name?: string;
   address: string;
   city: string;
   state: string;
@@ -15,10 +32,12 @@ interface GolfCourse {
   phone?: string;
   website?: string;
   rating?: number;
-  holes?: number;
-  par?: number;
   distance?: number;
   photoUrl?: string;
+  tees?: {
+    female: TeeBox[];
+    male: TeeBox[];
+  };
 }
 
 interface TeeTime {
@@ -30,18 +49,18 @@ interface TeeTime {
   price: number;
   holes: number;
 }
-
 interface SearchParams {
-  latitude: number;
-  longitude: number;
-  radius: number; // in miles
+  latitude?: number;
+  longitude?: number;
+  radius?: number; // in miles
+  query?: string;
   maxPrice?: number;
   date?: string;
 }
 
 class GolfAPIService {
   private baseURL: string;
-  
+
   constructor() {
     // In development, this points to our local express server
     // In production, this would be your deployed API URL
@@ -53,12 +72,23 @@ class GolfAPIService {
    * Search for golf courses via our Local Proxy
    */
   async searchCourses(params: SearchParams): Promise<GolfCourse[]> {
-    console.log(`📡 Uplink: Scanning radius ${params.radius}mi at [${params.latitude}, ${params.longitude}]`);
-    
+    const { latitude, longitude, radius, query } = params;
+
+    if (query) {
+      console.log(`📡 Uplink: Searching for "${query}"`);
+    } else {
+      console.log(`📡 Uplink: Scanning radius ${radius}mi at [${latitude}, ${longitude}]`);
+    }
+
     try {
-      const response = await fetch(
-        `${this.baseURL}/courses/search?lat=${params.latitude}&lng=${params.longitude}&radius=${params.radius}`,
-        {
+      let url = `${this.baseURL}/courses/search?`;
+      if (query) {
+        url += `q=${encodeURIComponent(query)}`;
+      } else {
+        url += `lat=${latitude}&lng=${longitude}&radius=${radius}`;
+      }
+
+      const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Accept': 'application/json'
@@ -77,19 +107,20 @@ class GolfAPIService {
       
       return rawCourses.map((course: any) => ({
         id: course.id?.toString() || Math.random().toString(),
-        name: course.name || course.course_name || 'Unknown Championship Course',
-        address: course.address || course.location?.address || '',
-        city: course.city || course.location?.city || '',
-        state: course.state || course.location?.state || '',
-        zipCode: course.zipCode || course.location?.zip || '',
-        latitude: parseFloat(course.lat || course.latitude || course.location?.latitude || params.latitude),
-        longitude: parseFloat(course.lng || course.longitude || course.location?.longitude || params.longitude),
+        name: course.course_name || course.club_name || course.name || 'Unknown Championship Course',
+        club_name: course.club_name,
+        course_name: course.course_name,
+        address: course.location?.address || course.address || '',
+        city: course.location?.city || course.city || '',
+        state: course.location?.state || course.state || '',
+        zipCode: course.location?.zipCode || course.zipCode || '',
+        latitude: parseFloat(course.location?.latitude || course.latitude || params.latitude || 0),
+        longitude: parseFloat(course.location?.longitude || course.longitude || params.longitude || 0),
         phone: course.phone,
         website: course.website,
         rating: course.rating || 4.5,
-        holes: course.holes || 18,
-        par: course.par || 72,
-        photoUrl: course.photoUrl || course.photo_url || `https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&sig=${Math.random()}`
+        photoUrl: course.photoUrl || course.photo_url || `https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&sig=${Math.random()}`,
+        tees: course.tees
       }));
     } catch (error) {
       console.error('❌ Search Failed:', error);

@@ -13,6 +13,7 @@ export default function GolfBookingApp() {
   
   // Filter State
   const [searchRadius, setSearchRadius] = useState(25); // miles
+  const [searchQuery, setSearchQuery] = useState('');
   const [maxPrice, setMaxPrice] = useState(150);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [playerCount, setPlayerCount] = useState(4);
@@ -23,12 +24,12 @@ export default function GolfBookingApp() {
     getUserLocation();
   }, []);
 
-  // Search courses when location or filters change
+  // Search courses when location, radius, or search query changes
   useEffect(() => {
-    if (userLocation) {
+    if (userLocation || searchQuery) {
       searchCourses();
     }
-  }, [userLocation, searchRadius]);
+  }, [userLocation, searchRadius, searchQuery]);
 
   const getUserLocation = () => {
     setLoading(true);
@@ -61,33 +62,36 @@ export default function GolfBookingApp() {
   };
 
   const searchCourses = async () => {
-    if (!userLocation) return;
+    if (!userLocation && !searchQuery) return;
 
     setLoading(true);
     setError(null);
 
     try {
       const results = await golfAPI.searchCourses({
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-        radius: searchRadius
+        latitude: userLocation?.latitude,
+        longitude: userLocation?.longitude,
+        radius: searchRadius,
+        query: searchQuery
       });
 
-      // Calculate distance for each course
+      // Calculate distance for each course if location is available
       const coursesWithDistance = results.map((course) => ({
         ...course,
-        distance: golfAPI.calculateDistance(
+        distance: userLocation ? golfAPI.calculateDistance(
           userLocation.latitude,
           userLocation.longitude,
           course.latitude,
           course.longitude
-        )
+        ) : 0
       }));
 
-      // Sort by distance
-      coursesWithDistance.sort((a, b) => 
-        (a.distance || 0) - (b.distance || 0)
-      );
+      // Sort by distance if location available, otherwise by name
+      if (userLocation) {
+        coursesWithDistance.sort((a, b) => 
+          (a.distance || 0) - (b.distance || 0)
+        );
+      }
 
       setCourses(coursesWithDistance);
       setLoading(false);
@@ -182,15 +186,26 @@ export default function GolfBookingApp() {
       {/* Header */}
       <header className="bg-[#0D0E11] border-b border-white/5 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-fit">
               <div className="w-10 h-10 bg-[#30C476] rounded-xl flex items-center justify-center">
                 <MapPin className="w-6 h-6 text-[#0A0907]" />
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <h1 className="text-xl font-bold text-[#FCF6EB]">Fluff Booking</h1>
                 <p className="text-[10px] text-[#FCF6EB]/40 uppercase tracking-wider">GPS Course Finder</p>
               </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="flex-1 max-w-md relative">
+              <input
+                type="text"
+                placeholder="Search by course name or town..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-sm text-[#FCF6EB] placeholder:text-[#FCF6EB]/20 focus:outline-none focus:border-[#30C476]/50 transition-colors"
+              />
             </div>
             
             <button
@@ -198,7 +213,7 @@ export default function GolfBookingApp() {
               className="flex items-center gap-2 px-4 py-2 bg-[#30C476]/10 border border-[#30C476]/20 rounded-xl text-[#30C476] text-sm font-bold hover:bg-[#30C476]/20 transition-colors"
             >
               <Filter className="w-4 h-4" />
-              Filters
+              <span className="hidden sm:inline">Filters</span>
             </button>
           </div>
 
@@ -310,7 +325,7 @@ export default function GolfBookingApp() {
                   {selectedCourse.address}, {selectedCourse.city}, {selectedCourse.state}
                 </p>
                 
-                <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex flex-wrap gap-4 text-sm mb-6">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-[#30C476]" />
                     <span>{selectedCourse.distance} miles away</span>
@@ -321,13 +336,50 @@ export default function GolfBookingApp() {
                       <span>{selectedCourse.rating} / 5.0</span>
                     </div>
                   )}
-                  {selectedCourse.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-[#30C476]" />
-                      <span>{selectedCourse.phone}</span>
-                    </div>
-                  )}
                 </div>
+
+                {/* Scorecard Preview */}
+                {selectedCourse.tees && (selectedCourse.tees.male.length > 0 || selectedCourse.tees.female.length > 0) && (
+                  <div className="mt-6 pt-6 border-t border-white/10">
+                    <h4 className="text-sm font-bold text-[#30C476] uppercase tracking-wider mb-4">Course Scorecard (Blue Tees)</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="text-[#FCF6EB]/40 border-b border-white/5">
+                            <th className="py-2 pr-4">Hole</th>
+                            {selectedCourse.tees.male[0].holes.map((_, i) => (
+                              <th key={i} className="py-2 px-2 text-center">{i + 1}</th>
+                            ))}
+                            <th className="py-2 pl-4 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b border-white/5">
+                            <td className="py-3 pr-4 font-bold">Par</td>
+                            {selectedCourse.tees.male[0].holes.map((hole, i) => (
+                              <td key={i} className="py-3 px-2 text-center">{hole.par}</td>
+                            ))}
+                            <td className="py-3 pl-4 text-right font-bold">{selectedCourse.tees.male[0].par_total}</td>
+                          </tr>
+                          <tr className="border-b border-white/5">
+                            <td className="py-3 pr-4 font-bold">Yards</td>
+                            {selectedCourse.tees.male[0].holes.map((hole, i) => (
+                              <td key={i} className="py-3 px-2 text-center text-[#30C476]">{hole.yardage}</td>
+                            ))}
+                            <td className="py-3 pl-4 text-right font-bold text-[#30C476]">{selectedCourse.tees.male[0].total_yards}</td>
+                          </tr>
+                          <tr>
+                            <td className="py-3 pr-4 font-bold">Handicap</td>
+                            {selectedCourse.tees.male[0].holes.map((hole, i) => (
+                              <td key={i} className="py-3 px-2 text-center text-[#FCF6EB]/40">{hole.handicap}</td>
+                            ))}
+                            <td className="py-3 pl-4 text-right">-</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
