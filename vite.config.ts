@@ -1,25 +1,23 @@
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig, loadEnv } from "vite";
+import react from "@vitejs/plugin-react";
 
-// https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  
+  const env = loadEnv(mode, process.cwd(), "");
+
   return {
-    // Only use /TheClubhouse/ as base for GitHub Pages production builds
-    base: process.env.GITHUB_ACTIONS === 'true' ? '/TheClubhouse/' : '/',
+    base: process.env.GITHUB_ACTIONS === "true" ? "/TheClubhouse/" : "/",
     plugins: [react()],
     server: {
       proxy: {
-        '/api': {
-          target: 'http://localhost:3000',
+        "/api": {
+          target: "http://localhost:3000",
           changeOrigin: true,
         },
       },
     },
     resolve: {
       alias: {
-        '@shared': '/shared',
+        "@shared": "/shared",
       },
     },
     build: {
@@ -27,5 +25,5 @@ export default defineConfig(({ command, mode }) => {
         transformMixedEsModules: true,
       },
     },
-  }
-})
+  };
+});
