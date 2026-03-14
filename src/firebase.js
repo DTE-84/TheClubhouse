@@ -2,13 +2,10 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore"; 
 import { firebaseConfig } from "./firebaseConfig";
-
-
+import { getApps } from "firebase/app";
 let app;
 if (typeof window !== "undefined") {
- 
-  import { getApps } from "firebase/app";
-  if (!getApps().length) {
+   if (!getApps().length) {
     app = initializeApp(firebaseConfig);
   } else {
     app = getApps()[0];
