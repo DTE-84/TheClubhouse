@@ -52,6 +52,11 @@ export const handleSearch: RequestHandler = async (req, res) => {
 export const handleGetCourse: RequestHandler = async (req, res) => {
   const { id } = req.params;
 
+  // Validate course ID to avoid using arbitrary user input in the request path
+  if (typeof id !== "string" || !/^[A-Za-z0-9_-]+$/.test(id)) {
+    return res.status(400).json({ error: "Invalid course ID format" });
+  }
+
   try {
     const response = await axios.get(`${BASE_URL}/course/${id}`, {
       headers: {
