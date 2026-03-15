@@ -14,17 +14,6 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-if (!firebaseConfig.projectId) {
-    console.error("Firebase Project ID is missing from env. Falling back to hardcoded config for system stability.");
-    firebaseConfig.apiKey = "AIzaSyBhdyQSv15D1DohjCDZMwY5lq-JEurwUKg";
-    firebaseConfig.authDomain = "theclubhouse-cf31f.firebaseapp.com";
-    firebaseConfig.projectId = "theclubhouse-cf31f";
-    firebaseConfig.storageBucket = "theclubhouse-cf31f.firebasestorage.app";
-    firebaseConfig.messagingSenderId = "717259924552";
-    firebaseConfig.appId = "1:717259924552:web:b5936b68b1549c800d647d";
-    firebaseConfig.measurementId = "G-ETL5PRSF1K";
-}
-
 const app = initializeApp(firebaseConfig);
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 const auth = getAuth(app);
