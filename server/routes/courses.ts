@@ -41,13 +41,16 @@ export const handleSearch: RequestHandler = async (req, res) => {
 
     res.json(response.data);
   } catch (error: any) {
-    console.error("❌ API Error:", error.message);
-    res.status(error.response?.status || 500).json({
-      error: "Failed to fetch courses from provider",
-      details: error.message,
-    });
+  console.error("❌ API Error:", error.message);
+  if (error.response) {
+    console.error("❌ Error Response Data:", JSON.stringify(error.response.data));
+    console.error("❌ Error Status:", error.response.status);
   }
-};
+  res.status(error.response?.status || 500).json({
+    error: "Failed to fetch courses from provider",
+    details: error.message,
+  });
+  }};
 
 export const handleGetCourse: RequestHandler = async (req, res) => {
   const { id } = req.params;
